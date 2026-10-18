@@ -1,0 +1,8 @@
+fastapi
+uvicorn
+pydantic
+sqlalchemy
+psycopg2-binary
+psycopg
+pwdlib[argon2]
+PyJWT
