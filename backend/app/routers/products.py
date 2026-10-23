@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models import Product, User
-from app.schemas.product import ProductCreate, ProductResponse
+from app.schemas.product import ProductCreate, ProductResponse, ProductUpdate
 from app.dependencies.auth import require_role
 from app.models.seller_profile import SellerProfile
 
@@ -73,7 +73,187 @@ def get_my_products(
         )
 
     products = db.query(Product).filter(
-        Product.seller_id == seller_profile.id
+        Product.seller_id == seller_profile.id,
+        Product.status != "DELETED"
     ).order_by(Product.id.desc()).all()
 
     return products
+
+@router.get("/{product_id}", response_model= ProductResponse)
+def get_my_product(
+    product_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role("SELLER"))
+):
+    seller_profile = db.query(SellerProfile).filter(
+        SellerProfile.user_id == current_user.id
+    ).first()
+
+    if not seller_profile:
+        raise HTTPException(
+            status_code= 404,
+            detail= "Seller profile not found for this account"
+        )
+    
+    product = db.query(Product).filter(
+        Product.id == product_id,
+        Product.seller_id == seller_profile.id,
+        Product.status != "DELETED"
+    ).first()
+
+    if not product:
+        raise HTTPException(
+            status_code= 404,
+            detail= "Product not found"
+        )
+    
+    return product
+
+@router.patch("/{product_id}", response_model=ProductResponse)
+def update_product(
+    product_id: int,
+    product_data: ProductUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role("SELLER"))
+):
+    seller_profile = db.query(SellerProfile).filter(
+        SellerProfile.user_id == current_user.id
+    ).first()
+
+    if not seller_profile:
+        raise HTTPException(
+            status_code= 404,
+            detail="Seller Profile not found for this account"
+        )
+    
+    product = db.query(Product).filter(
+        Product.id == product_id,
+        Product.seller_id == seller_profile.id,
+        Product.status != "DELETED"
+    ).first()
+
+    if not product:
+        raise HTTPException(
+            status_code= 404,
+            detail= " Product not found"
+        )
+    
+    update_data = product_data.model_dump(exclude_unset=True)
+    if any(value is None for value in update_data.values()):
+        raise HTTPException(
+            status_code=422,
+            detail="Fields cannot be null. Omit fields you do not want to update."
+        )
+
+    if not update_data:
+        raise HTTPException(
+            status_code= 400,
+            detail= "Provide atleast one field to update"
+        )
+
+    for field, value in update_data.items():
+        if field in {"demo_url", "thumbnail_url", "product_url"}:
+            value = str(Value)
+        setattr(product, field, value)
+    
+    try:
+        db.commit()
+        db.refresh(product)
+    except Exception as e:
+        db.rollback()
+        print("PRODUCT UPDATE ERROR:", repr(e))
+        raise HTTPException(
+            status_code= 500,
+            detail="Failed to update product. Check the server terminal"
+        )
+    return product
+
+@router.delete("/{product_id}")
+def soft_delete_product(
+    product_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role("SELLER"))
+):
+    seller_profile = db.query(SellerProfile).filter(
+        SellerProfile.user_id == current_user.id
+    ).first()
+
+    if not seller_profile:
+        raise HTTPException(
+            status_code= 404,
+            detail= "Seller Profile not found for this account"
+        )
+
+    product = db.query(Product).filter(
+        Product.id == product_id,
+        Product.seller_id == seller_profile.id,
+        Product.status != "DELETED"
+    ).first()
+
+    if not product:
+        raise HTTPException(
+            status_code= 404,
+            detail="Product not found"
+        )
+    
+    product.status = "DELETED"
+
+    try:
+        db.commit()
+        db.refresh(product)
+    except Exception as e:
+        db.rollback()
+        print("PRODUCT SOFT DELETE ERROR:", repr(e))
+        raise HTTPException(
+            status_code= 500,
+            detail= "Failed to delete product. Check the server terminal."
+        )
+    
+    return {
+        "message": "Product Deleted Successfully",
+        "product_id": product_id
+    }
+
+@router.delete("/{product_id}/permanent")
+def permanently_delete_product(
+    product_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role("SELLER"))
+):
+    seller_profile = db.query(SellerProfile).filter(
+        SellerProfile.user_id == current_user.id
+    ).first()
+
+    if not seller_profile:
+        raise HTTPException(
+            status_code= 404,
+            detail= "Seller Profile not found for this account"
+        )
+    
+    product = db.query(Product).filter(
+        Product.id == product_id,
+        Product.seller_id == seller_profile.id,
+        Product.status == "DELETED"
+    ).first()
+
+    if not product:
+        raise HTTPException(
+            status_code=404,
+            detail="Product not found"
+        )
+
+    try:
+        db.delete(product)
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        print("PRODUCT PERMANENT DELETE ERROR:", repr(e))
+        raise HTTPException(
+            status_code=409,
+            detail="Cannot permanently delete this product because it may have related database records."
+        )
+
+    return {
+        "message": "Product permanently deleted",
+        "product_id": product_id
+    }
