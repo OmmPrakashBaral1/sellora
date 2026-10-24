@@ -257,3 +257,45 @@ def permanently_delete_product(
         "message": "Product permanently deleted",
         "product_id": product_id
     }
+
+
+@router.patch("/{product_id}/approve")
+def approve_product(
+    product_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role("ADMIN"))
+):
+    product = db.query(Product).filter(
+        Product.id == product_id,
+        Product.status != "DELETED"
+    ).first()
+
+    if product is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Product not found"
+        )
+
+    if product.status == "APPROVED":
+        raise HTTPException(
+            status_code=400,
+            detail="Product is already approved"
+        )
+
+    product.status = "APPROVED"
+
+    try:
+        db.commit()
+        db.refresh(product)
+    except Exception:
+        db.rollback()
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to approve product"
+        )
+
+    return {
+        "message": "Product approved successfully",
+        "product_id": product.id,
+        "status": product.status
+    }
