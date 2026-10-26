@@ -119,3 +119,71 @@ def create_order(
             for item in order.items
         ]
     }
+
+@router.get("/")
+def get_my_orders(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role("BUYER"))
+):
+    orders = (
+        db.query(Order)
+        .filter(Order.buyer_id == current_user.id)
+        .order_by(Order.created_at.desc())
+        .all()
+    )
+
+    return [
+        {
+            "order_id": order.id,
+            "total_amount": str(order.total_amount),
+            "status": order.status,
+            "created_at": order.created_at,
+            "items": [
+                {
+                    "product_id": item.product_id,
+                    "price_at_purchase": str(item.price_at_purchase),
+                    "quantity": item.quantity
+                }
+                for item in order.items
+            ]
+        }
+        for order in orders
+    ]
+
+
+@router.get("/{order_id}")
+def get_order_by_id(
+    order_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role("BUYER"))
+):
+    order = (
+        db.query(Order)
+        .filter(
+            Order.id == order_id,
+            Order.buyer_id == current_user.id
+        )
+        .first()
+    )
+
+    if order is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Order not found"
+        )
+
+    return {
+        "order_id": order.id,
+        "buyer_id": order.buyer_id,
+        "total_amount": str(order.total_amount),
+        "status": order.status,
+        "created_at": order.created_at,
+        "items": [
+            {
+                "product_id": item.product_id,
+                "price_at_purchase": str(item.price_at_purchase),
+                "quantity": item.quantity
+            }
+            for item in order.items
+        ]
+    }
