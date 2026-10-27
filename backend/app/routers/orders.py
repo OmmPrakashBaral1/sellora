@@ -65,7 +65,7 @@ def create_order(
             if p.id == item.product_id
         )
 
-        total_amount += product.price * item.quantity
+        total_amount += product.price
 
     order = Order(
         buyer_id=current_user.id,
@@ -89,7 +89,7 @@ def create_order(
                 order_id=order.id,
                 product_id=product.id,
                 price_at_purchase=product.price,
-                quantity=item.quantity
+                quantity=1
             )
 
             db.add(order_item)
@@ -150,6 +150,46 @@ def get_my_orders(
         for order in orders
     ]
 
+@router.get("/seller")
+def get_seller_orders(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role("SELLER"))
+):
+    orders = (
+        db.query(Order)
+        .join(OrderItem, Order.id == OrderItem.order_id)
+        .join(Product, OrderItem.product_id == Product.id)
+        .filter(Product.seller_id == current_user.id)
+        .distinct()
+        .all()
+    )
+
+    
+    result = []
+
+    for order in orders:
+        seller_items = []
+
+        for item in order.items:
+            if item.product.seller_id == current_user.id:
+                seller_items.append({
+                    "product_id": item.product_id,
+                    "title": item.product.title,
+                    "quantity": item.quantity,
+                    "price_at_purchase": float(item.price_at_purchase)
+                })
+
+        result.append({
+            "order_id": order.id,
+            "buyer_id": order.buyer_id,
+            "total_amount": float(order.total_amount),
+            "status": order.status,
+            "created_at": order.created_at,
+            "items": seller_items
+        })
+
+    return result
+
 
 @router.get("/{order_id}")
 def get_order_by_id(
@@ -187,3 +227,41 @@ def get_order_by_id(
             for item in order.items
         ]
     }
+
+@router.patch("/{order_id}/cancel")
+def cancel_order(
+    order_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role("BUYER"))
+):
+    order = (
+        db.query(Order).filter(
+            Order.id == order_id,
+            Order.buyer_id == current_user.id
+        ).first()
+    )
+
+    if order is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Order not found"
+        )
+    
+    if order.status != "PENDING":
+        raise HTTPException(
+            status_code=400,
+            detail="Only pending orders can be cancelled"
+        )
+    
+    order.status = "CANCELLED"
+
+    db.commit()
+    db.refresh(order)
+
+    return {
+        "message": "Order cancelled successfully",
+        "order_id": order.id,
+        "status": order.status
+    }
+
+
