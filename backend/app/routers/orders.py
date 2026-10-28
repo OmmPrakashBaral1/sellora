@@ -1,4 +1,4 @@
-
+from enum import Enum
 from decimal import Decimal
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -18,6 +18,10 @@ router = APIRouter(
     tags=["Orders"]
 )
 
+class OrderStatus(str, Enum):
+    CONFIRMED = "CONFIRMED"
+    REJECTED = "REJECTED"
+    COMPLETED = "COMPLETED"
 
 @router.post("/")
 def create_order(
@@ -265,3 +269,45 @@ def cancel_order(
     }
 
 
+@router.patch("/{order_id}/status")
+def update_order_status(
+    order_id: int,
+    new_status: OrderStatus,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role("SELLER"))
+):
+    order = (
+        db.query(Order)
+        .join(OrderItem, Order.id == OrderItem.order_id)
+        .join(Product, OrderItem.product_id == Product.id)
+        .filter(
+            Order.id == order_id,
+            Product.seller_id == current_user.id
+        )
+        .first()
+    )
+
+    if order is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Order not found for this seller"
+        )
+
+
+    if order.status != "PENDING" and not (
+        order.status == "CONFIRMED"
+        and new_status == OrderStatus.COMPLETED
+    ):
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid status transition"
+        )
+    order.status = new_status.value
+    db.commit()
+    db.refresh(order)
+
+    return {
+        "message": "Order status updated successfully",
+        "order_id": order.id,
+        "status": order.status
+    }
