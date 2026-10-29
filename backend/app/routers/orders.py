@@ -232,6 +232,43 @@ def get_order_by_id(
         ]
     }
 
+@router.get("/{order_id}/downloads")
+def get_order_downloads(
+    order_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role("BUYER"))
+):
+    order = (
+        db.query(Order).filter(
+            Order.id == order_id,
+            Order.buyer_id == current_user.id
+        ).first()
+    )
+
+    if order is None:
+        raise HTTPException(
+            status_code= 404,
+            detail= "Order not found"
+        )
+
+    if order.status != "COMPLETED":
+        raise HTTPException(
+            status_code= 400,
+            detail= "Downloads are available only for completed orders"
+        )
+    
+    return {
+        "order_id": order.id,
+        "downloads": [
+            {
+                "product_id": item.product_id,
+                "title": item.product.title,
+                "product_url": item.product.product_url
+            }
+            for item in order.items
+        ]
+    }
+
 @router.patch("/{order_id}/cancel")
 def cancel_order(
     order_id: int,
