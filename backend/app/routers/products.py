@@ -153,8 +153,11 @@ def update_product(
 
     for field, value in update_data.items():
         if field in {"demo_url", "thumbnail_url", "product_url"}:
-            value = str(Value)
+            value = str(value)
         setattr(product, field, value)
+    
+    if product.status in {"APPROVED", "REJECTED"}:
+        product.status = "PENDING"
     
     try:
         db.commit()
