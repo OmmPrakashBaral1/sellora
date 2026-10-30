@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -86,11 +86,15 @@ def get_my_products(
 
 @router.get("/marketplace", response_model=list[PublicProductResponse])
 def get_marketplace_products(
+    skip: int = Query(default=0, ge=0),
+    limit: int = Query(default=20, ge=1, le=100),
     db: Session = Depends(get_db)
 ):
     products = db.query(Product).filter(
         Product.status == "APPROVED"
-    ).order_by(Product.id.desc()).all()
+    ).order_by(
+        Product.id.desc()
+    ).offset(skip).limit(limit).all()
 
     return products
 
