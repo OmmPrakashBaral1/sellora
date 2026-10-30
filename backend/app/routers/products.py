@@ -3,7 +3,12 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models import Product, User
-from app.schemas.product import ProductCreate, ProductResponse, ProductUpdate
+from app.schemas.product import (
+    ProductCreate,
+    ProductResponse,
+    ProductUpdate,
+    PublicProductResponse
+)
 from app.dependencies.auth import require_role
 from app.models.seller_profile import SellerProfile
 
@@ -78,6 +83,34 @@ def get_my_products(
     ).order_by(Product.id.desc()).all()
 
     return products
+
+@router.get("/marketplace", response_model=list[PublicProductResponse])
+def get_marketplace_products(
+    db: Session = Depends(get_db)
+):
+    products = db.query(Product).filter(
+        Product.status == "APPROVED"
+    ).order_by(Product.id.desc()).all()
+
+    return products
+
+@router.get("/marketplace/{product_id}", response_model=PublicProductResponse)
+def get_marketplace_product(
+    product_id: int,
+    db: Session = Depends(get_db)
+):
+    product = db.query(Product).filter(
+        Product.id == product_id,
+        Product.status == "APPROVED"
+    ).first()
+
+    if not product:
+        raise HTTPException(
+            status_code=404,
+            detail="Product not found"
+        )
+    
+    return product
 
 @router.get("/{product_id}", response_model= ProductResponse)
 def get_my_product(

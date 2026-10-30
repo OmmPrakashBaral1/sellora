@@ -37,3 +37,15 @@ class ProductUpdate(BaseModel):
     @classmethod
     def model_validate(cls, obj, **kwargs):
         return super().model_validate(obj, **kwargs)
+
+
+class PublicProductResponse(BaseModel):
+    id: int
+    title: str
+    description: str
+    price: Decimal
+    demo_url: str
+    thumbnail_url: str
+    status: str
+
+    model_config = ConfigDict(from_attributes=True)
