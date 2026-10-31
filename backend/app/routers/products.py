@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
+from sqlalchemy import or_, cast, Text, String
 
 from app.database import get_db
 from app.models import Product, User
@@ -42,6 +43,7 @@ def create_product(
         demo_url=str(product_data.demo_url),
         thumbnail_url=str(product_data.thumbnail_url),
         product_url=str(product_data.product_url),
+        tags=product_data.tags,
         status="PENDING"
     )
 
@@ -88,15 +90,59 @@ def get_my_products(
 def get_marketplace_products(
     skip: int = Query(default=0, ge=0),
     limit: int = Query(default=20, ge=1, le=100),
+    search: str | None = Query(default=None, min_length=1, max_length=100),
     db: Session = Depends(get_db)
 ):
-    products = db.query(Product).filter(
+    query = db.query(Product).filter(
         Product.status == "APPROVED"
-    ).order_by(
+    )
+
+    if search:
+        search_term = f"%{search.strip()}%"
+
+        query = query.filter(
+            or_(
+                Product.title.ilike(search_term),
+                Product.description.ilike(search_term),
+                cast(Product.tags, Text).ilike(search_term)
+            )
+        )
+    
+    products = query.order_by(
         Product.id.desc()
     ).offset(skip).limit(limit).all()
 
     return products
+
+@router.get("/marketplace/suggestions")
+def get_marketplace_product(
+    search: str = Query(
+        min_length=2,
+        max_length=100
+    ),
+    db: Session = Depends(get_db)
+):
+    search_term = f"%{search.strip()}%"
+
+    products = db.query(Product).filter(
+        Product.status == "APPROVED",
+        or_(
+            Product.title.ilike(search_term),
+            cast(Product.tags, Text).ilike(search_term)
+        )
+    ).limit(10).all()
+
+    suggestions = []
+
+    for product in products:
+        if search.lower() in product.title.lower():
+            suggestions.append(product.title)
+
+        for tag in product.tags:
+            if search.lower() in tag.lower():
+                suggestions.append(tag)
+
+    return list(dict.fromkeys(suggestions))[:10]
 
 @router.get("/marketplace/{product_id}", response_model=PublicProductResponse)
 def get_marketplace_product(

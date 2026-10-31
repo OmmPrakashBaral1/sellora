@@ -7,7 +7,8 @@ from sqlalchemy import (
     Integer,
     ForeignKey,
     TIMESTAMP,
-    func
+    func,
+    ARRAY
 )
 from sqlalchemy.orm import relationship
 
@@ -32,6 +33,11 @@ class Product(Base):
     product_url= Column(String(255), nullable= False)
 
     status= Column(String(20), nullable=False)
+    tags = Column(
+        ARRAY(String(50)),
+        nullable=False,
+        default=list
+    )
 
     created_at= Column(
         TIMESTAMP,
