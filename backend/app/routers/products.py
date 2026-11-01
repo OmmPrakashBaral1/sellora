@@ -91,8 +91,25 @@ def get_marketplace_products(
     skip: int = Query(default=0, ge=0),
     limit: int = Query(default=20, ge=1, le=100),
     search: str | None = Query(default=None, min_length=1, max_length=100),
+    min_price: float | None = Query(default=None, ge=0),
+    max_price: float | None = Query(default=None, ge=0),
+    tag: str | None = Query(default=None, min_length=1, max_length=50),
+    sort_by: str = Query(
+        default="newest",
+        pattern="^(newest|price_asc|price_desc)$"
+    ),
     db: Session = Depends(get_db)
 ):
+    if (
+        min_price is not None
+        and max_price is not None
+        and min_price > max_price
+    ):
+        raise HTTPException(
+            status_code=422,
+            detail="Minimum price cannot be greater than maximum price"
+        )
+
     query = db.query(Product).filter(
         Product.status == "APPROVED"
     )
@@ -108,9 +125,30 @@ def get_marketplace_products(
             )
         )
     
-    products = query.order_by(
-        Product.id.desc()
-    ).offset(skip).limit(limit).all()
+    if min_price is not None:
+        query = query.filter(
+            Product.price >= min_price
+        )
+
+    if max_price is not None:
+        query = query.filter(
+            Product.price <= max_price
+        )
+    
+    if tag:
+        query = query.filter(
+            Product.tags.op("@>")([tag.strip().lower()])
+        )
+    if sort_by == "price_asc":
+        query = query.order_by(Product.price.asc(), Product.id.desc())
+
+    elif sort_by == "price_desc":
+        query = query.order_by(Product.price.desc(), Product.id.desc())
+
+    else:
+        query = query.order_by(Product.id.desc())
+
+    products = query.offset(skip).limit(limit).all()
 
     return products
 
