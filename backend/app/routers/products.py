@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
-from sqlalchemy import or_, cast, Text, String
+from sqlalchemy import or_, cast, Text, String, func
 
 from app.database import get_db
 from app.models import Product, User
@@ -161,6 +161,44 @@ def get_marketplace_product(
         )
     
     return product
+
+@router.get(
+    "/marketplace/{product_id}/related",
+    response_model=list[PublicProductResponse]
+)
+def get_related_products(
+    product_id: int,
+    db: Session = Depends(get_db)
+):
+    product = db.query(Product).filter(
+        Product.id == product_id,
+        Product.status == "APPROVED"
+    ).first()
+
+    if not product:
+        raise HTTPException(
+            status_code=404,
+            detail="Product not found"
+        )
+
+    if not product.tags:
+        return []
+
+    related_products = db.query(Product).filter(
+        Product.status == "APPROVED",
+        Product.id != product_id,
+        Product.tags.op("&&")(product.tags)
+    ).all()
+
+    related_products.sort(
+        key=lambda item: (
+            len(set(product.tags).intersection(set(item.tags))),
+            item.id
+        ),
+        reverse=True
+    )
+
+    return related_products[:5]
 
 @router.get("/{product_id}", response_model= ProductResponse)
 def get_my_product(
