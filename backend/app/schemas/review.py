@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field, ConfigDict
-
+from datetime import datetime
 
 class ReviewCreate(BaseModel):
     rating: int = Field(ge=1, le=5)
@@ -22,5 +22,14 @@ class ReviewResponse(BaseModel):
     order_id: int
     rating: int
     comment: str
+
+    model_config = ConfigDict(from_attributes=True)
+
+class PublicReviewResponse(BaseModel):
+    id: int
+    product_id: int
+    rating: int
+    comment: str
+    created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)

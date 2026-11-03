@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 
@@ -7,7 +7,8 @@ from app.models import Review, Product, Order, OrderItem
 from app.schemas.review import (
     ReviewCreate,
     ReviewUpdate,
-    ReviewResponse
+    ReviewResponse,
+    PublicReviewResponse
 )
 from app.dependencies.auth import require_role
 from app.models import User
@@ -16,6 +17,32 @@ router = APIRouter(
     prefix="/reviews",
     tags=["Reviews"]
 )
+
+@router.get("/products/{product_id}", response_model=list[PublicReviewResponse])
+def get_product_reviews(
+    product_id: int,
+    skip: int = Query(default=0, ge=0),
+    limit: int = Query(default=10, ge=1, le=100),
+    db: Session = Depends(get_db)
+):
+    product = db.query(Product).filter(
+        Product.id == product_id
+    ).first()
+
+    if product is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Product not found"
+        )
+    
+    reviews = db.query(Review).filter(
+        Review.product_id == product_id
+    ).order_by(
+        Review.created_at.desc()
+    ).offset(skip).limit(limit).all()
+
+    return reviews
+
 
 @router.post("/products/{product_id}", response_model=ReviewResponse, status_code=201)
 def create_review(
@@ -116,3 +143,30 @@ def update_review(
     db.refresh(review)
 
     return review
+
+@router.delete("/{review_id}", status_code=204)
+def delete_review(
+    review_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role("BUYER"))
+):
+    review = db.query(Review).filter(
+        Review.id == review_id
+    ).first()
+
+    if review is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Review not found"
+        )
+    
+    if review.buyer_id != current_user.id:
+        raise HTTPException(
+            status_code=403,
+            detail="You are not allowed to delete this review"
+        )
+
+    db.delete(review)
+    db.commit()
+
+    return None
