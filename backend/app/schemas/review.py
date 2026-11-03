@@ -2,9 +2,6 @@ from pydantic import BaseModel, Field, ConfigDict
 
 
 class ReviewCreate(BaseModel):
-    product_id: int
-    order_id: int
-
     rating: int = Field(ge=1, le=5)
     comment: str = Field(min_length=1, max_length=2000)
 

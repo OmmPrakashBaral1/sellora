@@ -8,6 +8,7 @@ from app.models import User
 from app.routers.auth import router as auth_router
 from app.routers.products import router as products_router
 from app.routers.orders import router as orders_router
+from app.routers.reviews import router as reviews_router
 
 from app.dependencies.auth import get_current_user, require_role
 
@@ -15,6 +16,7 @@ app = FastAPI(title="Sellora API")
 app.include_router(auth_router)
 app.include_router(products_router)
 app.include_router(orders_router)
+app.include_router(reviews_router)
 
 
 Base.metadata.create_all(bind=engine)
