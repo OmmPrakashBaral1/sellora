@@ -72,3 +72,47 @@ def create_review(
         )
     
     return new_review
+
+@router.patch("/{review_id}", response_model=ReviewResponse)
+def update_review(
+    review_id: int,
+    review_data: ReviewUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role("BUYER"))
+):
+    review = db.query(Review).filter(
+        Review.id == review_id
+    ).first()
+
+    if review is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Review not found"
+        )
+    
+    if review.buyer_id != current_user.id:
+        raise HTTPException(
+            status_code=403,
+            detail="You are not allowed to update this review"
+        )
+    
+    if (
+        review_data.rating is None
+        and review_data.comment is None
+    ):
+        raise HTTPException(
+            status_code=400,
+            detail="At least one field (rating or comment) is required"
+        )
+
+    if review_data.rating is not None:
+        review.rating = review_data.rating
+
+    if review_data.comment is not None:
+        review.comment = review_data.comment.strip()
+    
+
+    db.commit()
+    db.refresh(review)
+
+    return review
