@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy import func
 
 from app.database import get_db
 from app.models import Review, Product, Order, OrderItem
@@ -8,7 +9,8 @@ from app.schemas.review import (
     ReviewCreate,
     ReviewUpdate,
     ReviewResponse,
-    PublicReviewResponse
+    PublicReviewResponse,
+    ReviewSummaryResponse
 )
 from app.dependencies.auth import require_role
 from app.models import User
@@ -43,6 +45,53 @@ def get_product_reviews(
 
     return reviews
 
+@router.get("/products/{product_id}/summary", response_model= ReviewSummaryResponse)
+def get_product_review_summary(
+    product_id: int,
+    db: Session = Depends(get_db)
+):
+    product = db.query(Product).filter(
+        Product.id == product_id
+    ).first()
+
+    if product is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Product not found"
+        )
+    
+    result = db.query(
+        func.avg(Review.rating),
+        func.count(Review.id)
+    ).filter(
+        Review.product_id == product_id
+    ).first()
+
+    average_rating = result[0] or 0
+    total_reviews = result[1]
+
+    rating_results = db.query(
+        Review.rating,
+        func.count(Review.id)
+    ).filter(
+        Review.product_id == product_id
+    ).group_by(
+        Review.rating
+    ).all()
+
+    rating_distribution = {
+        rating: 0 for rating in range(1, 6)
+    }
+
+    for rating, count in rating_results:
+        rating_distribution[rating] = count
+
+    return {
+        "product_id": product_id,
+        "average_rating": round(float(average_rating), 2),
+        "total_reviews": total_reviews,
+        "rating_distribution": rating_distribution
+    }
 
 @router.post("/products/{product_id}", response_model=ReviewResponse, status_code=201)
 def create_review(

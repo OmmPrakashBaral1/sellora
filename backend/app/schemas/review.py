@@ -33,3 +33,9 @@ class PublicReviewResponse(BaseModel):
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
+
+class ReviewSummaryResponse(BaseModel):
+    product_id: int
+    average_rating: float
+    total_reviews: int
+    rating_distribution: dict[int, int]
