@@ -18,7 +18,7 @@ class SellerProfile(Base):
     )
 
     store_name = Column(String, nullable=False)
-    description = Column(Text, nullable=True)
+    description = Column(Text, nullable=False)
     created_at = Column(TIMESTAMP)
 
     user = relationship("User")

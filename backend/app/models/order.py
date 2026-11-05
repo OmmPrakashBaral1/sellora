@@ -16,7 +16,7 @@ from app.database import Base
 class Order(Base):
     __tablename__ = "orders"
 
-    id = Column(BigInteger, primary_key=True, index=True)
+    id = Column(BigInteger, primary_key=True)
 
     buyer_id = Column(
         BigInteger,
@@ -38,4 +38,12 @@ class Order(Base):
         onupdate=func.now()
     )
 
-    items = relationship("OrderItem", back_populates="order")
+    items = relationship(
+        "OrderItem",
+        back_populates="order"
+    )
+
+    seller_orders = relationship(
+        "SellerOrder",
+        back_populates="order"
+    )

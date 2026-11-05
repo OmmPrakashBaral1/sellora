@@ -17,7 +17,7 @@ from app.database import Base
 class Product(Base):
     __tablename__ = "products"
 
-    id= Column(BigInteger, primary_key= True, index= True)
+    id= Column(BigInteger, primary_key= True)
     seller_id = Column(
         BigInteger,
         ForeignKey("seller_profiles.id"),

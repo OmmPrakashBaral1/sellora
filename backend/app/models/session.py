@@ -20,7 +20,7 @@ class UserSession(Base):
     revoked_at = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(
         DateTime(timezone=True),
-        nullable=False,
+        nullable=True,
         server_default=func.now()
     )
 

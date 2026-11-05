@@ -1,9 +1,23 @@
-from sqlalchemy import Column, BigInteger, String, TIMESTAMP
+from sqlalchemy import (
+    Column,
+    BigInteger,
+    String,
+    TIMESTAMP,
+    UniqueConstraint
+)
+
 from app.database import Base
 
 
 class User(Base):
     __tablename__ = "users"
+
+    __table_args__ = (
+        UniqueConstraint(
+            "gmail",
+            name="uq_users_gmail"
+        ),
+    )
 
     id = Column(BigInteger, primary_key=True)
     name = Column(String(50), nullable=False)

@@ -15,12 +15,19 @@ from app.database import Base
 class OrderItem(Base):
     __tablename__ = "order_items"
 
-    id = Column(BigInteger, primary_key=True, index=True)
+    id = Column(BigInteger, primary_key=True)
 
     order_id = Column(
         BigInteger,
         ForeignKey("orders.id"),
         nullable=False
+    )
+
+    seller_order_id = Column(
+        BigInteger,
+        ForeignKey("seller_orders.id"),
+        nullable=True,
+        index=True
     )
 
     product_id = Column(
@@ -39,3 +46,7 @@ class OrderItem(Base):
 
     order = relationship("Order", back_populates="items")
     product = relationship("Product")
+    seller_order = relationship(
+        "SellerOrder",
+        back_populates="items"
+    )
