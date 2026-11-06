@@ -6,6 +6,7 @@ from sqlalchemy import (
     String,
     ForeignKey,
     TIMESTAMP,
+    UniqueConstraint,
     func
 )
 from sqlalchemy.orm import relationship
@@ -15,6 +16,14 @@ from app.database import Base
 
 class SellerOrder(Base):
     __tablename__ = "seller_orders"
+
+    __table_args__ = (
+        UniqueConstraint(
+            "order_id",
+            "seller_id",
+            name="uq_seller_orders_order_id_seller_id"
+        ),
+    )
 
     id = Column(BigInteger, primary_key=True, index=True)
 

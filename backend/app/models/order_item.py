@@ -26,7 +26,7 @@ class OrderItem(Base):
     seller_order_id = Column(
         BigInteger,
         ForeignKey("seller_orders.id"),
-        nullable=True,
+        nullable=False,
         index=True
     )
 
