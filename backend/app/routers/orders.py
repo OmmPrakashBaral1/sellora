@@ -235,6 +235,7 @@ def get_seller_orders(
     ]
 
 
+
 @router.get("/{order_id}")
 def get_order_by_id(
     order_id: int,
@@ -272,9 +273,32 @@ def get_order_by_id(
         ]
     }
 
+
+@router.get("/{order_id}/downloads")
+def get_order_downloads(
+    order_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role("BUYER"))
+):
+    order = (
+        db.query(Order)
+        .filter(
+            Order.id == order_id,
+            Order.buyer_id == current_user.id
+        )
+        .first()
+    )
+
+    if order is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Order not found"
+        )
+
     completed_items = [
         item for item in order.items
-        if item.seller_order.status == "COMPLETED"
+        if item.seller_order is not None
+        and item.seller_order.status == "COMPLETED"
     ]
 
     if not completed_items:
@@ -295,6 +319,8 @@ def get_order_by_id(
         ]
     }
 
+
+
 @router.patch("/{order_id}/cancel")
 def cancel_order(
     order_id: int,
@@ -302,10 +328,13 @@ def cancel_order(
     current_user: User = Depends(require_role("BUYER"))
 ):
     order = (
-        db.query(Order).filter(
+        db.query(Order)
+        .filter(
             Order.id == order_id,
             Order.buyer_id == current_user.id
-        ).first()
+        )
+        .with_for_update()
+        .first()
     )
 
     if order is None:
@@ -313,23 +342,50 @@ def cancel_order(
             status_code=404,
             detail="Order not found"
         )
-    
+
     if order.status != "PENDING":
         raise HTTPException(
             status_code=400,
             detail="Only pending orders can be cancelled"
         )
-    
-    order.status = "CANCELLED"
 
-    db.commit()
-    db.refresh(order)
+    seller_orders = (
+        db.query(SellerOrder)
+        .filter(SellerOrder.order_id == order.id)
+        .with_for_update()
+        .all()
+    )
+    if any(so.status != "PENDING" for so in seller_orders):
+        raise HTTPException(
+            status_code=400,
+            detail="Order cannot be cancelled because a seller has already processed it"
+        )
+
+    try:
+        for seller_order in seller_orders:
+            seller_order.status = "CANCELLED"
+
+        order.status = "CANCELLED"
+
+        db.commit()
+        db.refresh(order)
+
+    except Exception:
+        logger.exception("Failed to cancel order")
+        db.rollback()
+
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to cancel order"
+        )
 
     return {
         "message": "Order cancelled successfully",
         "order_id": order.id,
-        "status": order.status
+        "status": order.status,
+        "cancelled_seller_orders": len(seller_orders)
     }
+
 
 
 @router.patch("/{order_id}/status")
@@ -355,9 +411,20 @@ def update_order_status(
             detail="Order not found for this seller"
         )
 
-    if seller_order.status != "PENDING" and not (
-        seller_order.status == "CONFIRMED"
-        and new_status == OrderStatus.COMPLETED
+    allowed_transitions = {
+        "PENDING": [
+            OrderStatus.CONFIRMED,
+            OrderStatus.REJECTED
+        ],
+        "CONFIRMED": [
+            OrderStatus.COMPLETED
+        ],
+        "REJECTED": [],
+        "COMPLETED": []
+    }
+
+    if new_status not in allowed_transitions.get(
+        seller_order.status, []
     ):
         raise HTTPException(
             status_code=400,
