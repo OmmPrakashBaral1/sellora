@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.dependencies.auth import require_role
-from app.models import Order, Payment, User
+from app.models import Order, Payment, User, SellerOrder
 from app.schemas.payment import PaymentVerify
 
 
@@ -137,14 +137,14 @@ def verify_payment(
             status_code=404,
             detail="Payment record not found"
         )
-    
+
     if payment.status == "SUCCESS":
         return {
             "message": "Payment already verified",
             "payment_id": payment.id,
             "status": payment.status
         }
-    
+
     if payment.status != "PENDING":
         raise HTTPException(
             status_code=400,
@@ -181,7 +181,7 @@ def verify_payment(
             status_code=400,
             detail="Payment does not match the Razorpay order"
         )
-    
+
     if razorpay_payment.get("id") != payment_data.razorpay_payment_id:
         raise HTTPException(
             status_code=400,
@@ -193,7 +193,7 @@ def verify_payment(
             status_code=400,
             detail="Payment has not been captured"
         )
-    
+
     if razorpay_payment.get("currency") != "INR":
         raise HTTPException(
             status_code=400,
@@ -207,7 +207,7 @@ def verify_payment(
             status_code=400,
             detail="Payment amount does not match the order amount"
         )
-    
+
     existing_payment = (
         db.query(Payment)
         .filter(
@@ -262,13 +262,37 @@ def verify_payment(
             detail="Order is not awaiting payment"
         )
 
+
+    seller_orders = (
+        db.query(SellerOrder)
+        .filter(SellerOrder.order_id == order.id)
+        .with_for_update()
+        .all()
+    )
+
+    if not seller_orders:
+        raise HTTPException(
+            status_code=409,
+            detail="No seller orders found for this order"
+        )
+
+    if any(so.status != "PENDING" for so in seller_orders):
+        raise HTTPException(
+            status_code=409,
+            detail="Seller order status is inconsistent with pending payment"
+        )
+
     try:
         payment.razorpay_payment_id = payment_data.razorpay_payment_id
         payment.status = "SUCCESS"
 
-        order.status = "CONFIRMED"
+        for seller_order in seller_orders:
+            seller_order.status = "COMPLETED"
+
+        order.status = "COMPLETED"
 
         db.commit()
+
         db.refresh(payment)
         db.refresh(order)
 
@@ -281,9 +305,10 @@ def verify_payment(
         )
 
     return {
-        "message": "Payment verified successfully",
+        "message": "Payment verified and digital order completed successfully",
         "payment_id": payment.id,
         "order_id": order.id,
         "payment_status": payment.status,
-        "order_status": order.status
+        "order_status": order.status,
+        "completed_seller_orders": len(seller_orders)
     }

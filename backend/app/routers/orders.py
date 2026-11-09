@@ -1,4 +1,4 @@
-from enum import Enum
+
 from decimal import Decimal, ROUND_HALF_UP
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -12,7 +12,8 @@ from app.models import (
     Product,
     User,
     SellerOrder,
-    SellerProfile
+    SellerProfile,
+    Payment
 )
 from app.schemas.order import OrderCreate
 
@@ -25,10 +26,6 @@ router = APIRouter(
     tags=["Orders"]
 )
 
-class OrderStatus(str, Enum):
-    CONFIRMED = "CONFIRMED"
-    REJECTED = "REJECTED"
-    COMPLETED = "COMPLETED"
 
 @router.post("/")
 def create_order(
@@ -295,6 +292,27 @@ def get_order_downloads(
             detail="Order not found"
         )
 
+    if order.status != "COMPLETED":
+        raise HTTPException(
+            status_code=403,
+            detail="Order is not completed"
+        )
+
+    successful_payment = (
+        db.query(Payment)
+        .filter(
+            Payment.order_id == order.id,
+            Payment.status == "SUCCESS"
+        )
+        .first()
+    )
+
+    if successful_payment is None:
+        raise HTTPException(
+            status_code=403,
+            detail="Successful payment is required for downloads"
+        )
+
     completed_items = [
         item for item in order.items
         if item.seller_order is not None
@@ -384,92 +402,4 @@ def cancel_order(
         "order_id": order.id,
         "status": order.status,
         "cancelled_seller_orders": len(seller_orders)
-    }
-
-
-
-@router.patch("/{order_id}/status")
-def update_order_status(
-    order_id: int,
-    new_status: OrderStatus,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(require_role("SELLER"))
-):
-    seller_order = (
-        db.query(SellerOrder)
-        .join(SellerProfile)
-        .filter(
-            SellerOrder.order_id == order_id,
-            SellerProfile.user_id == current_user.id
-        )
-        .first()
-    )
-
-    if seller_order is None:
-        raise HTTPException(
-            status_code=404,
-            detail="Order not found for this seller"
-        )
-
-    allowed_transitions = {
-        "PENDING": [
-            OrderStatus.CONFIRMED,
-            OrderStatus.REJECTED
-        ],
-        "CONFIRMED": [
-            OrderStatus.COMPLETED
-        ],
-        "REJECTED": [],
-        "COMPLETED": []
-    }
-
-    if new_status not in allowed_transitions.get(
-        seller_order.status, []
-    ):
-        raise HTTPException(
-            status_code=400,
-            detail="Invalid status transition"
-        )
-
-    try:
-        seller_order.status = new_status.value
-
-        db.flush()
-
-        order = db.query(Order).filter(
-            Order.id == seller_order.order_id
-        ).first()
-
-        statuses = [
-            so.status for so in order.seller_orders
-        ]
-
-        if all(status == "COMPLETED" for status in statuses):
-            order.status = "COMPLETED"
-        elif all(status == "REJECTED" for status in statuses):
-            order.status = "REJECTED"
-        elif any(
-            status in ("CONFIRMED", "COMPLETED")
-            for status in statuses
-        ):
-            order.status = "CONFIRMED"
-        else:
-            order.status = "PENDING"
-
-        db.commit()
-        db.refresh(seller_order)
-
-    except Exception:
-        logger.exception("Failed to update seller order status")
-        db.rollback()
-        raise HTTPException(
-            status_code=500,
-            detail="Failed to update order status"
-        )
-
-    return {
-        "message": "Seller order status updated successfully",
-        "seller_order_id": seller_order.id,
-        "order_id": seller_order.order_id,
-        "status": seller_order.status
     }
