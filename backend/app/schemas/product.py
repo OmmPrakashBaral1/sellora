@@ -42,11 +42,15 @@ class ProductResponse(BaseModel):
 
     model_config = ConfigDict(from_attributes=True)
 
+
 class ProductUpdate(BaseModel):
-    title: str | None = Field(default=None, min_length=3, max_length= 200)
+    title: str | None = Field(default=None, min_length=3, max_length=200)
     description: str | None = Field(default=None, min_length=10)
     price: Decimal | None = Field(
-        default= None, gt= 0, max_digits= 10, decimal_places=2
+        default=None,
+        gt=0,
+        max_digits=10,
+        decimal_places=2
     )
     demo_url: HttpUrl | None = None
     thumbnail_url: HttpUrl | None = None
@@ -58,16 +62,13 @@ class ProductUpdate(BaseModel):
 
     model_config = ConfigDict(validate_assignment=True)
 
-    @classmethod
-    def model_validate(cls, obj, **kwargs):
-        return super().model_validate(obj, **kwargs)
-    
     @field_validator("tags")
     @classmethod
     def validate_tags(cls, tags):
-        if tag is None:
+        if tags is None:
             return None
-        cleaned_tags= []
+
+        cleaned_tags = []
 
         for tag in tags:
             tag = tag.strip().lower()
@@ -77,10 +78,10 @@ class ProductUpdate(BaseModel):
 
             if len(tag) > 50:
                 raise ValueError("Each tag must not exceed 50 characters")
-            
+
             if tag not in cleaned_tags:
                 cleaned_tags.append(tag)
-        
+
         return cleaned_tags
 
 

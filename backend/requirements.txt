@@ -6,3 +6,6 @@ psycopg2-binary
 psycopg
 pwdlib[argon2]
 PyJWT
+python-dotenv
+alembic
+razorpay
