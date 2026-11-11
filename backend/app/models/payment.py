@@ -1,9 +1,11 @@
+
 from sqlalchemy import (
     Column,
     BigInteger,
     Numeric,
     String,
     ForeignKey,
+    CheckConstraint,
     TIMESTAMP,
     func
 )
@@ -12,8 +14,16 @@ from sqlalchemy.orm import relationship
 
 from app.database import Base
 
+
 class Payment(Base):
-    __tablename__= "payments"
+    __tablename__ = "payments"
+
+    __table_args__ = (
+        CheckConstraint(
+            "amount > 0",
+            name="ck_payments_amount_positive"
+        ),
+    )
 
     id = Column(BigInteger, primary_key=True, index=True)
 

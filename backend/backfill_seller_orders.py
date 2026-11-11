@@ -7,7 +7,6 @@ def backfill_seller_orders():
 
     with engine.begin() as conn:
 
-        # 1. Verify every historical order item has a valid seller.
         unmatched = conn.execute(
             text("""
                 SELECT COUNT(*)
@@ -23,8 +22,6 @@ def backfill_seller_orders():
                 f"Found {unmatched} order items without a valid seller."
             )
 
-        # 2. Create one historical SellerOrder per
-        #    parent order and seller.
         conn.execute(
             text("""
                 INSERT INTO seller_orders (
@@ -66,8 +63,6 @@ def backfill_seller_orders():
             """)
         )
 
-        # 3. Connect each historical order item
-        #    to its corresponding SellerOrder.
         conn.execute(
             text("""
                 UPDATE order_items oi
@@ -80,7 +75,6 @@ def backfill_seller_orders():
             """)
         )
 
-        # 4. Verify that every item has been linked.
         unlinked = conn.execute(
             text("""
                 SELECT COUNT(*)
@@ -94,7 +88,6 @@ def backfill_seller_orders():
                 f"Backfill incomplete: {unlinked} items remain unlinked."
             )
 
-        # 5. Print final counts.
         seller_order_count = conn.execute(
             text("SELECT COUNT(*) FROM seller_orders")
         ).scalar()

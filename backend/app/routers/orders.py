@@ -60,7 +60,6 @@ def create_order(
                 detail=f"Product {product.id} is not available for purchase"
             )
 
-    # Group requested items by seller profile ID.
     seller_groups = {}
 
     for item in order_data.items:
@@ -80,7 +79,6 @@ def create_order(
             )
 
     try:
-        # Create the main buyer order.
         order = Order(
             buyer_id=current_user.id,
             total_amount=total_amount,
@@ -92,7 +90,6 @@ def create_order(
 
         seller_order_results = []
 
-        # Create one SellerOrder for each seller.
         for seller_id, items in seller_groups.items():
 
             subtotal = sum(
@@ -130,6 +127,7 @@ def create_order(
                     order_id=order.id,
                     seller_order_id=seller_order.id,
                     product_id=product.id,
+                    seller_id=seller_id,
                     price_at_purchase=product.price,
                     quantity=item.quantity
                 )
