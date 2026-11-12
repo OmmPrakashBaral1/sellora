@@ -6,6 +6,7 @@ from decimal import Decimal
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
+from sqlalchemy.exc import IntegrityError
 
 from app.database import get_db
 from app.dependencies.auth import require_role
@@ -47,6 +48,7 @@ def create_payment(
             Order.id == order_id,
             Order.buyer_id == current_user.id
         )
+        .with_for_update()
         .first()
     )
 
@@ -72,6 +74,55 @@ def create_payment(
 
     amount_in_paise = int(amount * 100)
 
+    existing_payments = (
+        db.query(Payment)
+        .filter(Payment.order_id == order.id)
+        .order_by(Payment.id.desc())
+        .with_for_update()
+        .all()
+    )
+
+    if existing_payments:
+        if any(p.status == "SUCCESS" for p in existing_payments):
+            raise HTTPException(
+                status_code=409,
+                detail="A successful payment already exists for this order. Payment reconciliation is required."
+            )
+
+        pending_payments = [
+            p for p in existing_payments
+            if p.status == "PENDING"
+        ]
+
+        if pending_payments:
+            existing_payment = pending_payments[0]
+
+            if not existing_payment.razorpay_order_id:
+                raise HTTPException(
+                    status_code=409,
+                    detail="An unresolved payment attempt exists. Reconciliation is required."
+                )
+
+            if existing_payment.amount != amount:
+                raise HTTPException(
+                    status_code=409,
+                    detail="Existing payment amount does not match the order"
+                )
+
+            return {
+                "message": "Existing payment attempt reused",
+                "payment_id": existing_payment.id,
+                "razorpay_key_id": RAZORPAY_KEY_ID,
+                "razorpay_order_id": existing_payment.razorpay_order_id,
+                "amount": amount_in_paise,
+                "currency": "INR"
+            }
+
+        raise HTTPException(
+            status_code=409,
+            detail="Previous payment attempts require reconciliation before another attempt can be created"
+        )
+
     try:
         razorpay_order = client.order.create({
             "amount": amount_in_paise,
@@ -79,8 +130,15 @@ def create_payment(
             "receipt": f"sellora_order_{order.id}"
         })
 
+        razorpay_order_id = razorpay_order.get("id")
+
+        if not razorpay_order_id:
+            raise ValueError("Razorpay did not return an order ID")
+
     except Exception:
         logger.exception("Failed to create Razorpay order")
+        db.rollback()
+
         raise HTTPException(
             status_code=502,
             detail="Unable to initiate payment"
@@ -90,7 +148,7 @@ def create_payment(
         order_id=order.id,
         amount=amount,
         provider="RAZORPAY",
-        razorpay_order_id=razorpay_order["id"],
+        razorpay_order_id=razorpay_order_id,
         status="PENDING"
     )
 
@@ -102,19 +160,21 @@ def create_payment(
     except Exception:
         logger.exception("Failed to save payment record")
         db.rollback()
+
         raise HTTPException(
             status_code=500,
-            detail="Failed to save payment information"
+            detail="Failed to save payment information. Payment reconciliation may be required."
         )
 
     return {
         "message": "Payment initiated successfully",
         "payment_id": payment.id,
         "razorpay_key_id": RAZORPAY_KEY_ID,
-        "razorpay_order_id": razorpay_order["id"],
+        "razorpay_order_id": razorpay_order_id,
         "amount": amount_in_paise,
         "currency": "INR"
     }
+
 
 @router.post("/verify")
 def verify_payment(
@@ -138,18 +198,8 @@ def verify_payment(
             detail="Payment record not found"
         )
 
-    if payment.status == "SUCCESS":
-        return {
-            "message": "Payment already verified",
-            "payment_id": payment.id,
-            "status": payment.status
-        }
-
-    if payment.status != "PENDING":
-        raise HTTPException(
-            status_code=400,
-            detail="Payment cannot be verified"
-        )
+    payment_id = payment.id
+    order_id = payment.order_id
 
     try:
         client.utility.verify_payment_signature({
@@ -208,6 +258,85 @@ def verify_payment(
             detail="Payment amount does not match the order amount"
         )
 
+    order = (
+        db.query(Order)
+        .filter(
+            Order.id == order_id,
+            Order.buyer_id == current_user.id
+        )
+        .with_for_update()
+        .first()
+    )
+
+    if order is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Associated order not found"
+        )
+
+    payment = (
+        db.query(Payment)
+        .filter(
+            Payment.id == payment_id,
+            Payment.order_id == order.id,
+            Payment.razorpay_order_id == payment_data.razorpay_order_id
+        )
+        .with_for_update()
+        .populate_existing()
+        .first()
+    )
+
+    if payment is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Payment record not found"
+        )
+
+    if payment.status == "SUCCESS":
+        if payment.razorpay_payment_id != payment_data.razorpay_payment_id:
+            raise HTTPException(
+                status_code=409,
+                detail="A different payment has already been recorded for this order"
+            )
+
+        seller_orders = (
+            db.query(SellerOrder)
+            .filter(SellerOrder.order_id == order.id)
+            .with_for_update()
+            .all()
+        )
+
+        if order.status != "COMPLETED":
+            raise HTTPException(
+                status_code=409,
+                detail="Payment is successful but order status is inconsistent. Manual reconciliation is required."
+            )
+
+        if not seller_orders or any(
+            so.status != "COMPLETED" for so in seller_orders
+        ):
+            raise HTTPException(
+                status_code=409,
+                detail="Payment is successful but seller order statuses are inconsistent. Manual reconciliation is required."
+            )
+
+        return {
+            "message": "Payment already verified",
+            "payment_id": payment.id,
+            "status": payment.status
+        }
+
+    if payment.status != "PENDING":
+        raise HTTPException(
+            status_code=409,
+            detail="Payment cannot be verified"
+        )
+
+    if order.status != "PENDING":
+        raise HTTPException(
+            status_code=409,
+            detail="Order is not awaiting payment"
+        )
     existing_payment = (
         db.query(Payment)
         .filter(
@@ -222,46 +351,6 @@ def verify_payment(
             status_code=409,
             detail="This Razorpay payment is already associated with another payment record"
         )
-
-    payment = (
-        db.query(Payment)
-        .filter(Payment.id == payment.id)
-        .with_for_update()
-        .populate_existing()
-        .first()
-    )
-
-    if payment is None:
-        raise HTTPException(
-            status_code=404,
-            detail="Payment record not found"
-        )
-
-    if payment.status != "PENDING":
-        raise HTTPException(
-            status_code=409,
-            detail="Payment has already been processed"
-        )
-
-    order = (
-        db.query(Order)
-        .filter(Order.id == payment.order_id)
-        .with_for_update()
-        .first()
-    )
-
-    if order is None:
-        raise HTTPException(
-            status_code=404,
-            detail="Associated order not found"
-        )
-
-    if order.status != "PENDING":
-        raise HTTPException(
-            status_code=400,
-            detail="Order is not awaiting payment"
-        )
-
 
     seller_orders = (
         db.query(SellerOrder)
@@ -296,9 +385,21 @@ def verify_payment(
         db.refresh(payment)
         db.refresh(order)
 
+    except IntegrityError:
+        logger.exception(
+            "Payment verification violated a database constraint"
+        )
+        db.rollback()
+
+        raise HTTPException(
+            status_code=409,
+            detail="This payment has already been recorded or conflicts with an existing payment record"
+        )
+
     except Exception:
         logger.exception("Failed to update payment and order")
         db.rollback()
+
         raise HTTPException(
             status_code=500,
             detail="Failed to update payment information"
