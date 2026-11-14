@@ -41,7 +41,13 @@ class Product(Base):
 
     demo_url = Column(String(255), nullable=False)
     thumbnail_url = Column(String(255), nullable=False)
-    product_url = Column(String(255), nullable=False)
+    product_url = Column(String(255), nullable=True)
+
+    file_storage_key = Column(
+        String(255),
+        nullable=True,
+        unique=True
+    )
 
     status = Column(String(20), nullable=False)
 
