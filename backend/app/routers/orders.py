@@ -1,3 +1,8 @@
+import mimetypes
+
+from fastapi.responses import FileResponse
+
+from app.services.file_storage import get_private_file_path
 
 from decimal import Decimal, ROUND_HALF_UP
 
@@ -25,7 +30,6 @@ router = APIRouter(
     prefix="/orders",
     tags=["Orders"]
 )
-
 
 @router.post("/")
 def create_order(
@@ -275,14 +279,10 @@ def get_order_downloads(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_role("BUYER"))
 ):
-    order = (
-        db.query(Order)
-        .filter(
-            Order.id == order_id,
-            Order.buyer_id == current_user.id
-        )
-        .first()
-    )
+    order = db.query(Order).filter(
+        Order.id == order_id,
+        Order.buyer_id == current_user.id
+    ).first()
 
     if order is None:
         raise HTTPException(
@@ -296,14 +296,10 @@ def get_order_downloads(
             detail="Order is not completed"
         )
 
-    successful_payment = (
-        db.query(Payment)
-        .filter(
-            Payment.order_id == order.id,
-            Payment.status == "SUCCESS"
-        )
-        .first()
-    )
+    successful_payment = db.query(Payment).filter(
+        Payment.order_id == order.id,
+        Payment.status == "SUCCESS"
+    ).first()
 
     if successful_payment is None:
         raise HTTPException(
@@ -329,7 +325,14 @@ def get_order_downloads(
             {
                 "product_id": item.product_id,
                 "title": item.product.title,
-                "product_url": item.product.product_url
+                "download_available": bool(
+                    item.product.file_storage_key
+                ),
+                "download_url": (
+                    f"/orders/{order.id}/downloads/{item.product_id}"
+                    if item.product.file_storage_key
+                    else None
+                )
             }
             for item in completed_items
         ]

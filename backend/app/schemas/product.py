@@ -2,12 +2,16 @@ from decimal import Decimal
 from pydantic import BaseModel, Field, HttpUrl, ConfigDict, field_validator
 
 class ProductCreate(BaseModel):
-    title: str = Field(..., min_length= 3, max_length= 200)
+    title: str = Field(..., min_length=3, max_length=200)
     description: str = Field(..., min_length=10)
-    price: Decimal = Field(..., gt=0, max_digits=10, decimal_places=2)
+    price: Decimal = Field(
+        ...,
+        gt=0,
+        max_digits=10,
+        decimal_places=2
+    )
     demo_url: HttpUrl
     thumbnail_url: HttpUrl
-    product_url: HttpUrl
     tags: list[str] = Field(default_factory=list, max_length=10)
 
     @field_validator("tags")
@@ -19,13 +23,14 @@ class ProductCreate(BaseModel):
             tag = tag.strip().lower()
 
             if not tag:
-                raise ValueError ("Tags cannot be empty")
-            
+                raise ValueError("Tags cannot be empty")
+
             if len(tag) > 50:
                 raise ValueError("Each tag must not exceed 50 characters")
+
             if tag not in cleaned_tags:
                 cleaned_tags.append(tag)
-            
+
         return cleaned_tags
 
 class ProductResponse(BaseModel):
@@ -36,7 +41,7 @@ class ProductResponse(BaseModel):
     price: Decimal
     demo_url: str
     thumbnail_url: str
-    product_url: str
+    product_url: str | None = None
     status: str
     tags: list[str]
 

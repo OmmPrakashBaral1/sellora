@@ -9,3 +9,4 @@ PyJWT
 python-dotenv
 alembic
 razorpay
+python-multipart

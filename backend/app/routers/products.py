@@ -1,4 +1,18 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import (
+    APIRouter,
+    Depends,
+    HTTPException,
+    Query,
+    File,
+    Form,
+    UploadFile
+)
+from decimal import Decimal
+from fastapi.exceptions import RequestValidationError
+from pydantic import ValidationError
+
+from app.services.file_storage import save_private_file
+from app.core.config import PRIVATE_STORAGE_DIR
 from sqlalchemy.orm import Session
 from sqlalchemy import or_, cast, Text, String, func
 
@@ -19,9 +33,16 @@ router = APIRouter(
 )
 
 
+
 @router.post("/", response_model=ProductResponse, status_code=201)
-def create_product(
-    product_data: ProductCreate,
+async def create_product(
+    title: str = Form(..., min_length=3, max_length=200),
+    description: str = Form(..., min_length=10),
+    price: Decimal = Form(..., gt=0, max_digits=10, decimal_places=2),
+    demo_url: str = Form(...),
+    thumbnail_url: str = Form(...),
+    tags: list[str] = Form(default=[]),
+    file: UploadFile = File(...),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_role("SELLER"))
 ):
@@ -35,6 +56,17 @@ def create_product(
             detail="Seller profile not found for this account"
         )
 
+    product_data = ProductCreate(
+        title=title,
+        description=description,
+        price=price,
+        demo_url=demo_url,
+        thumbnail_url=thumbnail_url,
+        tags=tags
+    )
+
+    storage_key = await save_private_file(file)
+
     product = Product(
         seller_id=seller_profile.id,
         title=product_data.title,
@@ -42,7 +74,8 @@ def create_product(
         price=product_data.price,
         demo_url=str(product_data.demo_url),
         thumbnail_url=str(product_data.thumbnail_url),
-        product_url=str(product_data.product_url),
+        product_url=None,
+        file_storage_key=storage_key,
         tags=product_data.tags,
         status="PENDING"
     )
@@ -52,16 +85,21 @@ def create_product(
     try:
         db.commit()
         db.refresh(product)
+
     except Exception as e:
         db.rollback()
+
+        file_path = PRIVATE_STORAGE_DIR / storage_key
+        file_path.unlink(missing_ok=True)
+
         print("PRODUCT CREATION ERROR:", repr(e))
+
         raise HTTPException(
             status_code=500,
-            detail="Failed to create product. Check the server terminal."
+            detail="Failed to create product."
         )
 
     return product
-
 
 
 @router.get("/", response_model=list[ProductResponse])
