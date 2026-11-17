@@ -26,3 +26,6 @@ MAX_UPLOAD_SIZE_BYTES = MAX_UPLOAD_SIZE_MB * 1024 * 1024
 
 if MAX_UPLOAD_SIZE_MB <= 0:
     raise ValueError("MAX_UPLOAD_SIZE_MB must be greater than zero")
+
+
+RAZORPAY_WEBHOOK_SECRET = os.getenv("RAZORPAY_WEBHOOK_SECRET")

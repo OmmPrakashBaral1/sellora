@@ -12,6 +12,7 @@ from app.routers.reviews import router as reviews_router
 from app.routers.payments import router as payments_router
 from app.routers.seller_orders import router as seller_order_router
 from app.routers.seller_applications import router as seller_applications_router
+from app.routers.webhooks import router as webhooks_router
 
 from app.dependencies.auth import get_current_user, require_role
 
@@ -23,6 +24,8 @@ app.include_router(reviews_router)
 app.include_router(payments_router)
 app.include_router(seller_order_router)
 app.include_router(seller_applications_router)
+app.include_router(webhooks_router)
+
 
 
 Base.metadata.create_all(bind=engine)

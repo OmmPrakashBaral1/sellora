@@ -8,3 +8,4 @@ from app.models.review import Review
 from app.models.payment import Payment
 from app.models.seller_order import SellerOrder
 from app.models.seller_application import SellerApplication
+from app.models.webhook_event import WebhookEvent

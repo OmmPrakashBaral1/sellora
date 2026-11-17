@@ -12,6 +12,10 @@ from app.database import get_db
 from app.dependencies.auth import require_role
 from app.models import Order, Payment, User, SellerOrder
 from app.schemas.payment import PaymentVerify
+from app.services.payment_settlement import (
+    settle_captured_payment,
+    PaymentSettlementError
+)
 
 
 logger = logging.getLogger(__name__)
@@ -258,132 +262,24 @@ def verify_payment(
             detail="Payment amount does not match the order amount"
         )
 
-    order = (
-        db.query(Order)
-        .filter(
-            Order.id == order_id,
-            Order.buyer_id == current_user.id
-        )
-        .with_for_update()
-        .first()
-    )
-
-    if order is None:
-        raise HTTPException(
-            status_code=404,
-            detail="Associated order not found"
-        )
-
-    payment = (
-        db.query(Payment)
-        .filter(
-            Payment.id == payment_id,
-            Payment.order_id == order.id,
-            Payment.razorpay_order_id == payment_data.razorpay_order_id
-        )
-        .with_for_update()
-        .populate_existing()
-        .first()
-    )
-
-    if payment is None:
-        raise HTTPException(
-            status_code=404,
-            detail="Payment record not found"
-        )
-
-    if payment.status == "SUCCESS":
-        if payment.razorpay_payment_id != payment_data.razorpay_payment_id:
-            raise HTTPException(
-                status_code=409,
-                detail="A different payment has already been recorded for this order"
-            )
-
-        seller_orders = (
-            db.query(SellerOrder)
-            .filter(SellerOrder.order_id == order.id)
-            .with_for_update()
-            .all()
-        )
-
-        if order.status != "COMPLETED":
-            raise HTTPException(
-                status_code=409,
-                detail="Payment is successful but order status is inconsistent. Manual reconciliation is required."
-            )
-
-        if not seller_orders or any(
-            so.status != "COMPLETED" for so in seller_orders
-        ):
-            raise HTTPException(
-                status_code=409,
-                detail="Payment is successful but seller order statuses are inconsistent. Manual reconciliation is required."
-            )
-
-        return {
-            "message": "Payment already verified",
-            "payment_id": payment.id,
-            "status": payment.status
-        }
-
-    if payment.status != "PENDING":
-        raise HTTPException(
-            status_code=409,
-            detail="Payment cannot be verified"
-        )
-
-    if order.status != "PENDING":
-        raise HTTPException(
-            status_code=409,
-            detail="Order is not awaiting payment"
-        )
-    existing_payment = (
-        db.query(Payment)
-        .filter(
-            Payment.razorpay_payment_id == payment_data.razorpay_payment_id,
-            Payment.id != payment.id
-        )
-        .first()
-    )
-
-    if existing_payment is not None:
-        raise HTTPException(
-            status_code=409,
-            detail="This Razorpay payment is already associated with another payment record"
-        )
-
-    seller_orders = (
-        db.query(SellerOrder)
-        .filter(SellerOrder.order_id == order.id)
-        .with_for_update()
-        .all()
-    )
-
-    if not seller_orders:
-        raise HTTPException(
-            status_code=409,
-            detail="No seller orders found for this order"
-        )
-
-    if any(so.status != "PENDING" for so in seller_orders):
-        raise HTTPException(
-            status_code=409,
-            detail="Seller order status is inconsistent with pending payment"
-        )
 
     try:
-        payment.razorpay_payment_id = payment_data.razorpay_payment_id
-        payment.status = "SUCCESS"
-
-        for seller_order in seller_orders:
-            seller_order.status = "COMPLETED"
-
-        order.status = "COMPLETED"
+        settlement = settle_captured_payment(
+            db=db,
+            payment_id=payment_id,
+            razorpay_order_id=payment_data.razorpay_order_id,
+            razorpay_payment_id=payment_data.razorpay_payment_id
+        )
 
         db.commit()
 
-        db.refresh(payment)
-        db.refresh(order)
+    except PaymentSettlementError as exc:
+        db.rollback()
+
+        raise HTTPException(
+            status_code=exc.status_code,
+            detail=exc.detail
+        )
 
     except IntegrityError:
         logger.exception(
@@ -397,7 +293,7 @@ def verify_payment(
         )
 
     except Exception:
-        logger.exception("Failed to update payment and order")
+        logger.exception("Failed to settle payment")
         db.rollback()
 
         raise HTTPException(
@@ -405,11 +301,18 @@ def verify_payment(
             detail="Failed to update payment information"
         )
 
+    if settlement["already_settled"]:
+        return {
+            "message": "Payment already verified",
+            "payment_id": settlement["payment_id"],
+            "status": "SUCCESS"
+        }
+
     return {
         "message": "Payment verified and digital order completed successfully",
-        "payment_id": payment.id,
-        "order_id": order.id,
-        "payment_status": payment.status,
-        "order_status": order.status,
-        "completed_seller_orders": len(seller_orders)
+        "payment_id": settlement["payment_id"],
+        "order_id": settlement["order_id"],
+        "payment_status": "SUCCESS",
+        "order_status": "COMPLETED",
+        "completed_seller_orders": settlement["seller_orders_count"]
     }
