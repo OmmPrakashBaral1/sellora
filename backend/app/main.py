@@ -1,4 +1,4 @@
-
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi import FastAPI, Depends
 
 from sqlalchemy.orm import Session
@@ -26,7 +26,16 @@ app.include_router(seller_order_router)
 app.include_router(seller_applications_router)
 app.include_router(webhooks_router)
 
-
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://localhost:5173",
+        "http://127.0.0.1:5173"
+    ],
+    allow_credentials=True,
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type"]
+)
 
 Base.metadata.create_all(bind=engine)
 
