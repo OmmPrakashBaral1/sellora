@@ -1,66 +1,106 @@
+
+import { ArrowUpRight } from 'lucide-react'
 import { Link } from 'react-router'
+
 import type { PublicProduct } from '../types/product'
 
 interface ProductCardProps {
   product: PublicProduct
 }
 
-export default function ProductCard({ product }: ProductCardProps) {
+export default function ProductCard({
+  product,
+}: ProductCardProps) {
   const price = Number(product.price)
 
+  const formattedPrice =
+    product.price.trim() !== '' &&
+    Number.isFinite(price) &&
+    price >= 0
+      ? new Intl.NumberFormat('en-IN', {
+          style: 'currency',
+          currency: 'INR',
+          maximumFractionDigits: 2,
+        }).format(price)
+      : 'Price unavailable'
+
   return (
-    <article className="overflow-hidden rounded-xl border border-slate-800 bg-slate-900 transition hover:border-indigo-500">
-      <Link to={`/products/${product.id}`}>
-        <div className="aspect-video overflow-hidden bg-slate-800">
+    <article className="group min-w-0">
+      <Link
+        to={`/products/${product.id}`}
+        aria-label={`View ${product.title}`}
+        className="
+          block rounded-2xl
+          focus-visible:outline-2
+          focus-visible:outline-offset-4
+          focus-visible:outline-brand
+        "
+      >
+        <div
+          className="
+            relative aspect-[4/3] overflow-hidden
+            rounded-2xl border border-outline
+            bg-accent
+          "
+        >
           <img
             src={product.thumbnail_url}
             alt={product.title}
             loading="lazy"
-            className="h-full w-full object-cover transition duration-300 hover:scale-105"
+            decoding="async"
+            className="
+              h-full w-full object-cover
+              transition-transform duration-500
+              group-hover:scale-[1.04]
+            "
           />
+
+          <div
+            className="
+              absolute bottom-3 right-3
+              flex h-10 w-10 items-center justify-center
+              rounded-full bg-surface
+              text-foreground shadow-sm
+              transition-all duration-200
+              group-hover:bg-brand
+              group-hover:text-brand-foreground
+            "
+            aria-hidden="true"
+          >
+            <ArrowUpRight className="h-5 w-5" />
+          </div>
+        </div>
+
+        <div className="px-1 pt-4">
+          {product.tags.length > 0 && (
+            <p className="mb-2 truncate text-xs font-semibold uppercase tracking-[0.12em] text-brand">
+              {product.tags.slice(0, 2).join(' · ')}
+            </p>
+          )}
+
+          <div className="flex items-start justify-between gap-3">
+            <h3
+              className="
+                min-w-0 flex-1 text-lg font-bold
+                leading-snug tracking-tight
+                text-foreground
+                transition-colors
+                group-hover:text-brand
+              "
+            >
+              {product.title}
+            </h3>
+
+            <span className="shrink-0 text-base font-bold text-foreground">
+              {formattedPrice}
+            </span>
+          </div>
+
+          <p className="mt-2 line-clamp-2 text-sm leading-relaxed text-muted">
+            {product.description}
+          </p>
         </div>
       </Link>
-
-      <div className="p-5">
-        <div className="mb-3 flex flex-wrap gap-2">
-          {product.tags.slice(0, 3).map((tag) => (
-            <span
-              key={tag}
-              className="rounded-full bg-indigo-500/10 px-3 py-1 text-xs text-indigo-300"
-            >
-              {tag}
-            </span>
-          ))}
-        </div>
-
-        <Link to={`/products/${product.id}`}>
-          <h2 className="text-lg font-semibold text-white hover:text-indigo-400">
-            {product.title}
-          </h2>
-        </Link>
-
-        <p className="mt-2 line-clamp-2 text-sm text-slate-400">
-          {product.description}
-        </p>
-
-        <div className="mt-5 flex items-center justify-between">
-          <span className="text-xl font-bold text-white">
-            {Number.isFinite(price)
-              ? new Intl.NumberFormat('en-IN', {
-                style: 'currency',
-                currency: 'INR',
-              }).format(price)
-              : 'Price unavailable'}
-          </span>
-
-          <Link
-            to={`/products/${product.id}`}
-            className="rounded-lg bg-brand px-4 py-2 text-sm font-medium text-brand-foreground transition hover:opacity-90"
-          >
-            View Details
-          </Link>
-        </div>
-      </div>
     </article>
   )
 }

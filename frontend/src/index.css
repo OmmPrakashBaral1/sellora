@@ -5,15 +5,14 @@
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 
-/* Match Sellora's existing ThemeContext */
 @custom-variant dark (&:is([data-theme="dark"] *));
 
 @theme inline {
-  /* Typography */
+  /* Sellora typography */
   --font-sans: "Urbanist", sans-serif;
   --font-heading: "Urbanist", sans-serif;
 
-  /* Existing Sellora tokens */
+  /* Sellora design tokens */
   --color-page: var(--page);
   --color-surface: var(--surface);
   --color-foreground: var(--foreground);
@@ -57,7 +56,7 @@
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
 
-  /* Border radius */
+  /* Radius scale */
   --radius-sm: calc(var(--radius) * 0.6);
   --radius-md: calc(var(--radius) * 0.8);
   --radius-lg: var(--radius);
@@ -71,14 +70,14 @@
 :root {
   color-scheme: light;
 
-  --page: #FAF8F3;
+  --page: #F7F6F3;
   --surface: #FFFFFF;
-  --foreground: #19372D;
-  --muted: #50645B;
-  --brand: #0F5B3A;
+  --foreground: #292633;
+  --muted: #625D6B;
+  --brand: #7662A2;
   --brand-foreground: #FFFFFF;
-  --accent: #F2E6D2;
-  --outline: #E2E8DF;
+  --accent: #ECE7F5;
+  --outline: #E7E5E4;
 
   --background: var(--page);
   --card: var(--surface);
@@ -89,11 +88,11 @@
   --primary: var(--brand);
   --primary-foreground: var(--brand-foreground);
 
-  --secondary: #E8F0E9;
-  --secondary-foreground: #19372D;
+  --secondary: #F0EDF4;
+  --secondary-foreground: var(--foreground);
 
   --muted-foreground: var(--muted);
-  --accent-foreground: #19372D;
+  --accent-foreground: var(--foreground);
 
   --destructive: #B42318;
 
@@ -101,13 +100,13 @@
   --input: var(--outline);
   --ring: var(--brand);
 
-  --chart-1: #0F5B3A;
-  --chart-2: #3E8962;
-  --chart-3: #79B99A;
-  --chart-4: #D6A96C;
-  --chart-5: #50645B;
+  --chart-1: #7662A2;
+  --chart-2: #A78BC7;
+  --chart-3: #D1A77C;
+  --chart-4: #6F8F99;
+  --chart-5: #625D6B;
 
-  --radius: 0.625rem;
+  --radius: 0.75rem;
 
   --sidebar: var(--surface);
   --sidebar-foreground: var(--foreground);
@@ -123,14 +122,14 @@
 :root[data-theme="dark"] {
   color-scheme: dark;
 
-  --page: #101C19;
-  --surface: #1B3029;
-  --foreground: #F3F4EF;
-  --muted: #B6C9BE;
-  --brand: #9DD9B7;
-  --brand-foreground: #10251C;
-  --accent: #F2E6D2;
-  --outline: #345044;
+  --page: #151419;
+  --surface: #25232D;
+  --foreground: #F5F3F7;
+  --muted: #BBB6C4;
+  --brand: #B7A6EA;
+  --brand-foreground: #151419;
+  --accent: #322B43;
+  --outline: #393640;
 
   --background: var(--page);
   --card: var(--surface);
@@ -141,11 +140,11 @@
   --primary: var(--brand);
   --primary-foreground: var(--brand-foreground);
 
-  --secondary: #294438;
-  --secondary-foreground: #F3F4EF;
+  --secondary: #302D38;
+  --secondary-foreground: var(--foreground);
 
   --muted-foreground: var(--muted);
-  --accent-foreground: #19372D;
+  --accent-foreground: var(--foreground);
 
   --destructive: #F87171;
 
@@ -153,11 +152,11 @@
   --input: var(--outline);
   --ring: var(--brand);
 
-  --chart-1: #9DD9B7;
-  --chart-2: #68B98C;
-  --chart-3: #D6A96C;
-  --chart-4: #B6C9BE;
-  --chart-5: #5D9476;
+  --chart-1: #B7A6EA;
+  --chart-2: #8F7AC4;
+  --chart-3: #D1A77C;
+  --chart-4: #8CB4BE;
+  --chart-5: #BBB6C4;
 
   --sidebar: var(--surface);
   --sidebar-foreground: var(--foreground);
@@ -169,7 +168,7 @@
   --sidebar-ring: var(--brand);
 }
 
-/* BASE STYLES */
+/* GLOBAL BASE STYLES */
 @layer base {
   * {
     @apply border-border outline-ring/50;
