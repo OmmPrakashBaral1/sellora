@@ -47,15 +47,15 @@ export default function ProductCard({ product }: ProductCardProps) {
           <span className="text-xl font-bold text-white">
             {Number.isFinite(price)
               ? new Intl.NumberFormat('en-IN', {
-                  style: 'currency',
-                  currency: 'INR',
-                }).format(price)
+                style: 'currency',
+                currency: 'INR',
+              }).format(price)
               : 'Price unavailable'}
           </span>
 
           <Link
             to={`/products/${product.id}`}
-            className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-500"
+            className="rounded-lg bg-brand px-4 py-2 text-sm font-medium text-brand-foreground transition hover:opacity-90"
           >
             View Details
           </Link>

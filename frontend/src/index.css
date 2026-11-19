@@ -1,17 +1,189 @@
+
+@import url('https://fonts.googleapis.com/css2?family=Urbanist:wght@400;500;600;700;800&display=swap');
+
 @import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
 
+/* Match Sellora's existing ThemeContext */
+@custom-variant dark (&:is([data-theme="dark"] *));
+
+@theme inline {
+  /* Typography */
+  --font-sans: "Urbanist", sans-serif;
+  --font-heading: "Urbanist", sans-serif;
+
+  /* Existing Sellora tokens */
+  --color-page: var(--page);
+  --color-surface: var(--surface);
+  --color-foreground: var(--foreground);
+  --color-muted: var(--muted);
+  --color-brand: var(--brand);
+  --color-brand-foreground: var(--brand-foreground);
+  --color-accent: var(--accent);
+  --color-outline: var(--outline);
+
+  /* shadcn semantic tokens */
+  --color-background: var(--background);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  /* Charts */
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+
+  /* Sidebar */
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+
+  /* Border radius */
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
+}
+
+/* LIGHT THEME */
 :root {
-  font-family: Inter, system-ui, sans-serif;
-  font-synthesis: none;
-  text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
+  color-scheme: light;
+
+  --page: #FAF8F3;
+  --surface: #FFFFFF;
+  --foreground: #19372D;
+  --muted: #50645B;
+  --brand: #0F5B3A;
+  --brand-foreground: #FFFFFF;
+  --accent: #F2E6D2;
+  --outline: #E2E8DF;
+
+  --background: var(--page);
+  --card: var(--surface);
+  --card-foreground: var(--foreground);
+  --popover: var(--surface);
+  --popover-foreground: var(--foreground);
+
+  --primary: var(--brand);
+  --primary-foreground: var(--brand-foreground);
+
+  --secondary: #E8F0E9;
+  --secondary-foreground: #19372D;
+
+  --muted-foreground: var(--muted);
+  --accent-foreground: #19372D;
+
+  --destructive: #B42318;
+
+  --border: var(--outline);
+  --input: var(--outline);
+  --ring: var(--brand);
+
+  --chart-1: #0F5B3A;
+  --chart-2: #3E8962;
+  --chart-3: #79B99A;
+  --chart-4: #D6A96C;
+  --chart-5: #50645B;
+
+  --radius: 0.625rem;
+
+  --sidebar: var(--surface);
+  --sidebar-foreground: var(--foreground);
+  --sidebar-primary: var(--brand);
+  --sidebar-primary-foreground: var(--brand-foreground);
+  --sidebar-accent: var(--secondary);
+  --sidebar-accent-foreground: var(--foreground);
+  --sidebar-border: var(--outline);
+  --sidebar-ring: var(--brand);
 }
 
-body {
-  margin: 0;
-  min-width: 320px;
+/* DARK THEME */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+
+  --page: #101C19;
+  --surface: #1B3029;
+  --foreground: #F3F4EF;
+  --muted: #B6C9BE;
+  --brand: #9DD9B7;
+  --brand-foreground: #10251C;
+  --accent: #F2E6D2;
+  --outline: #345044;
+
+  --background: var(--page);
+  --card: var(--surface);
+  --card-foreground: var(--foreground);
+  --popover: var(--surface);
+  --popover-foreground: var(--foreground);
+
+  --primary: var(--brand);
+  --primary-foreground: var(--brand-foreground);
+
+  --secondary: #294438;
+  --secondary-foreground: #F3F4EF;
+
+  --muted-foreground: var(--muted);
+  --accent-foreground: #19372D;
+
+  --destructive: #F87171;
+
+  --border: var(--outline);
+  --input: var(--outline);
+  --ring: var(--brand);
+
+  --chart-1: #9DD9B7;
+  --chart-2: #68B98C;
+  --chart-3: #D6A96C;
+  --chart-4: #B6C9BE;
+  --chart-5: #5D9476;
+
+  --sidebar: var(--surface);
+  --sidebar-foreground: var(--foreground);
+  --sidebar-primary: var(--brand);
+  --sidebar-primary-foreground: var(--brand-foreground);
+  --sidebar-accent: var(--secondary);
+  --sidebar-accent-foreground: var(--foreground);
+  --sidebar-border: var(--outline);
+  --sidebar-ring: var(--brand);
 }
 
-button {
-  cursor: pointer;
+/* BASE STYLES */
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+
+  html {
+    @apply font-sans;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    margin: 0;
+    min-width: 320px;
+    min-height: 100vh;
+    font-family: "Urbanist", sans-serif;
+  }
 }
