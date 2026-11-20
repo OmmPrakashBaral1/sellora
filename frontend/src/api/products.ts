@@ -1,13 +1,66 @@
+
 import { API_BASE_URL } from './client'
 import type { PublicProduct } from '../types/product'
 
-export async function getMarketplaceProducts(): Promise<PublicProduct[]> {
-  const response = await fetch(
-    `${API_BASE_URL}/products/marketplace`
-  )
+export interface MarketplaceProductFilters {
+  search?: string
+  tag?: string
+  minPrice?: number
+  maxPrice?: number
+  sortBy?: 'newest' | 'price_asc' | 'price_desc'
+  skip?: number
+  limit?: number
+}
+
+export async function getMarketplaceProducts(
+  signal?: AbortSignal,
+  filters: MarketplaceProductFilters = {}
+): Promise<PublicProduct[]> {
+  const params = new URLSearchParams()
+
+  const search = filters.search?.trim()
+  const tag = filters.tag?.trim()
+
+  if (search) {
+    params.set('search', search)
+  }
+
+  if (tag) {
+    params.set('tag', tag)
+  }
+
+  if (filters.minPrice !== undefined) {
+    params.set('min_price', String(filters.minPrice))
+  }
+
+  if (filters.maxPrice !== undefined) {
+    params.set('max_price', String(filters.maxPrice))
+  }
+
+  if (filters.sortBy) {
+    params.set('sort_by', filters.sortBy)
+  }
+
+  if (filters.skip !== undefined) {
+    params.set('skip', String(filters.skip))
+  }
+
+  if (filters.limit !== undefined) {
+    params.set('limit', String(filters.limit))
+  }
+
+  const query = params.toString()
+
+  const url = `${API_BASE_URL}/products/marketplace${
+    query ? `?${query}` : ''
+  }`
+
+  const response = await fetch(url, { signal })
 
   if (!response.ok) {
-    throw new Error(`Failed to load products: HTTP ${response.status}`)
+    throw new Error(
+      `Failed to load products: HTTP ${response.status}`
+    )
   }
 
   const data: unknown = await response.json()

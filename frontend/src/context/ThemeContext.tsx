@@ -1,22 +1,13 @@
-
 import {
-  createContext,
-  useContext,
   useEffect,
   useState,
   type ReactNode,
 } from 'react'
 
-type Theme = 'light' | 'dark'
-
-interface ThemeContextValue {
-  theme: Theme
-  toggleTheme: () => void
-}
-
-const ThemeContext = createContext<ThemeContextValue | undefined>(
-  undefined
-)
+import {
+  ThemeContext,
+  type Theme,
+} from './theme-context'
 
 function getInitialTheme(): Theme {
   try {
@@ -47,12 +38,14 @@ export function ThemeProvider({
     try {
       localStorage.setItem('sellora-theme', theme)
     } catch {
-      // Theme switching still works if storage is unavailable.
+      // Theme switching works even without localStorage.
     }
   }, [theme])
 
   function toggleTheme() {
-    setTheme((current) => (current === 'light' ? 'dark' : 'light'))
+    setTheme((current) =>
+      current === 'light' ? 'dark' : 'light'
+    )
   }
 
   return (
@@ -60,14 +53,4 @@ export function ThemeProvider({
       {children}
     </ThemeContext.Provider>
   )
-}
-
-export function useTheme() {
-  const context = useContext(ThemeContext)
-
-  if (!context) {
-    throw new Error('useTheme must be used within ThemeProvider')
-  }
-
-  return context
 }

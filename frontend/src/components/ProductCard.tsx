@@ -2,6 +2,7 @@
 import { ArrowUpRight } from 'lucide-react'
 import { Link } from 'react-router'
 
+import ProductThumbnail from './ProductThumbnail'
 import type { PublicProduct } from '../types/product'
 
 interface ProductCardProps {
@@ -29,42 +30,17 @@ export default function ProductCard({
       <Link
         to={`/products/${product.id}`}
         aria-label={`View ${product.title}`}
-        className="
-          block rounded-2xl
-          focus-visible:outline-2
-          focus-visible:outline-offset-4
-          focus-visible:outline-brand
-        "
+        className="block rounded-2xl focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand"
       >
-        <div
-          className="
-            relative aspect-[4/3] overflow-hidden
-            rounded-2xl border border-outline
-            bg-accent
-          "
-        >
-          <img
+        <div className="relative aspect-[4/3] overflow-hidden rounded-2xl border border-outline bg-accent">
+          <ProductThumbnail
             src={product.thumbnail_url}
             alt={product.title}
-            loading="lazy"
-            decoding="async"
-            className="
-              h-full w-full object-cover
-              transition-transform duration-500
-              group-hover:scale-[1.04]
-            "
+            className="h-full w-full transition-transform duration-500 group-hover:scale-[1.04] motion-reduce:transform-none"
           />
 
           <div
-            className="
-              absolute bottom-3 right-3
-              flex h-10 w-10 items-center justify-center
-              rounded-full bg-surface
-              text-foreground shadow-sm
-              transition-all duration-200
-              group-hover:bg-brand
-              group-hover:text-brand-foreground
-            "
+            className="absolute bottom-3 right-3 flex h-10 w-10 items-center justify-center rounded-full bg-surface text-foreground shadow-sm transition-colors duration-200 group-hover:bg-brand group-hover:text-brand-foreground"
             aria-hidden="true"
           >
             <ArrowUpRight className="h-5 w-5" />
@@ -74,20 +50,12 @@ export default function ProductCard({
         <div className="px-1 pt-4">
           {product.tags.length > 0 && (
             <p className="mb-2 truncate text-xs font-semibold uppercase tracking-[0.12em] text-brand">
-              {product.tags.slice(0, 2).join(' · ')}
+              {product.tags.slice(0, 2).join(' / ')}
             </p>
           )}
 
           <div className="flex items-start justify-between gap-3">
-            <h3
-              className="
-                min-w-0 flex-1 text-lg font-bold
-                leading-snug tracking-tight
-                text-foreground
-                transition-colors
-                group-hover:text-brand
-              "
-            >
+            <h3 className="min-w-0 flex-1 text-lg font-bold leading-snug tracking-tight text-foreground transition-colors group-hover:text-brand">
               {product.title}
             </h3>
 

@@ -1,216 +1,219 @@
 
-import { ArrowRight, ArrowUpRight, BookOpen, Code2, Layers3, Palette, Sparkles } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { ArrowRight, ArrowUpRight } from 'lucide-react'
 import { Link } from 'react-router'
 
-const categories = [
-    {
-        title: 'Templates',
-        description: 'Ready-made foundations for your next big idea.',
-        icon: Layers3,
-        label: '01',
-    },
-    {
-        title: 'Design Assets',
-        description: 'Creative resources crafted for standout work.',
-        icon: Palette,
-        label: '02',
-    },
-    {
-        title: 'Code & Scripts',
-        description: 'Developer tools that help you build faster.',
-        icon: Code2,
-        label: '03',
-    },
-    {
-        title: 'Ebooks & Guides',
-        description: 'Practical knowledge from independent creators.',
-        icon: BookOpen,
-        label: '04',
-    },
-]
+import { getMarketplaceProducts } from '../api/products'
+import ProductCard from '../components/ProductCard'
+import type { PublicProduct } from '../types/product'
+
+const PREVIEW_LIMIT = 6
 
 export default function HomePage() {
-    return (
-        <main className="min-h-screen bg-page text-foreground">
-            {/* HERO SECTION */}
-            <section className="relative overflow-hidden border-b border-outline">
-                <div className="pointer-events-none absolute -right-32 top-0 h-96 w-96 rounded-full bg-accent opacity-60 blur-3xl" />
+  const [products, setProducts] = useState<PublicProduct[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
-                <div className="relative mx-auto grid max-w-7xl items-center gap-10 px-6 pt-10 pb-16 lg:grid-cols-2 lg:gap-14 lg:pt-12 lg:pb-20">
-                    <div>
-                        <div className="mb-8 inline-flex items-center gap-2 rounded-full border border-outline bg-surface px-4 py-2 text-sm font-semibold text-brand">
-                            <Sparkles className="h-4 w-4" />
-                            A marketplace for digital creators
-                        </div>
+  useEffect(() => {
+    const controller = new AbortController()
 
-                        <h1 className="max-w-3xl text-5xl font-extrabold leading-[1.08] tracking-tight sm:text-6xl lg:text-7xl">
-                            Your next idea
-                            <span className="block text-brand">
-                                starts here.
-                            </span>
-                        </h1>
+    async function loadProducts() {
+      try {
+        const data = await getMarketplaceProducts(controller.signal)
 
-                        <p className="mt-7 max-w-xl text-lg leading-relaxed text-muted">
-                            Discover exceptional templates, design assets,
-                            code, ebooks, and digital tools from independent
-                            creators around the world.
-                        </p>
+        if (!controller.signal.aborted) {
+          setProducts(data.slice(0, PREVIEW_LIMIT))
+        }
+      } catch (err) {
+        if (!controller.signal.aborted) {
+          setError(
+            err instanceof Error
+              ? err.message
+              : 'Unable to load products.'
+          )
+        }
+      } finally {
+        if (!controller.signal.aborted) {
+          setLoading(false)
+        }
+      }
+    }
 
-                        <div className="mt-9 flex flex-wrap items-center gap-4">
-                            <Link
-                                to="/products"
-                                className="inline-flex items-center gap-2 rounded-xl bg-brand px-6 py-3.5 font-semibold text-brand-foreground transition hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
-                            >
-                                Explore Products
-                                <ArrowUpRight className="h-5 w-5" />
-                            </Link>
+    void loadProducts()
 
-                            <a
-                                href="#categories"
-                                className="inline-flex items-center gap-2 rounded-xl border border-outline bg-surface px-6 py-3.5 font-semibold text-foreground transition hover:bg-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
-                            >
-                                Browse Categories
-                                <ArrowRight className="h-4 w-4" />
-                            </a>
-                        </div>
-                    </div>
+    return () => controller.abort()
+  }, [])
 
-                    {/* EDITORIAL VISUAL */}
-                    <div className="relative">
-                        <div className="relative overflow-hidden rounded-[2rem] border border-outline bg-accent p-8 shadow-xl shadow-black/5 sm:p-12">
-                            <div className="absolute right-8 top-8 h-20 w-20 rounded-full border border-brand/20" />
+  return (
+    <main className="min-h-screen bg-page text-foreground">
+      {/* EDITORIAL INTRODUCTION */}
+      <section className="border-b border-outline">
+        <div className="mx-auto max-w-7xl px-6 pb-14 pt-16 sm:pb-20 sm:pt-24">
+          <div className="mb-8 flex items-center gap-3">
+            <span className="h-px w-8 bg-brand" />
+            <p className="text-xs font-bold uppercase tracking-[0.22em] text-brand">
+              Independent digital marketplace
+            </p>
+          </div>
 
-                            <div className="relative flex min-h-[350px] flex-col justify-between">
-                                <div className="flex items-center justify-between">
-                                    <span className="text-xs font-bold uppercase tracking-[0.25em] text-brand">
-                                        The Creative Edit
-                                    </span>
-                                    <Sparkles className="h-6 w-6 text-brand" />
-                                </div>
+          <div className="grid gap-10 lg:grid-cols-[1.5fr_0.5fr] lg:items-end">
+            <div>
+              <h1 className="max-w-4xl text-5xl font-bold leading-[1.04] tracking-[-0.045em] sm:text-6xl lg:text-[5.5rem]">
+                Digital goods for
+                <span className="block text-brand">
+                  people who make things.
+                </span>
+              </h1>
+            </div>
 
-                                <div className="py-12">
-                                    <div className="mb-6 flex items-center gap-3">
-                                        <div className="flex h-16 w-16 rotate-[-12deg] items-center justify-center rounded-2xl bg-brand text-brand-foreground shadow-lg">
-                                            <Palette className="h-8 w-8" />
-                                        </div>
-                                        <div className="flex h-16 w-16 rotate-[9deg] items-center justify-center rounded-2xl bg-surface text-brand shadow-lg">
-                                            <Code2 className="h-8 w-8" />
-                                        </div>
-                                        <div className="flex h-16 w-16 rotate-[-6deg] items-center justify-center rounded-2xl border border-outline bg-page text-foreground shadow-lg">
-                                            <Layers3 className="h-8 w-8" />
-                                        </div>
-                                    </div>
+            <div className="lg:pb-2">
+              <p className="max-w-sm text-base leading-7 text-muted">
+                Explore templates, design resources, code,
+                and practical digital tools from independent
+                creators.
+              </p>
 
-                                    <p className="max-w-sm text-4xl font-extrabold leading-tight tracking-tight text-foreground sm:text-5xl">
-                                        Create more.
-                                        <br />
-                                        Imagine bigger.
-                                    </p>
-                                </div>
+              <Link
+                to="/products"
+                className="mt-7 inline-flex items-center gap-2 border-b border-brand pb-2 text-sm font-semibold text-brand transition hover:gap-3 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand"
+              >
+                Explore the marketplace
+                <ArrowUpRight className="h-4 w-4" />
+              </Link>
+            </div>
+          </div>
 
-                                <div className="flex items-center justify-between border-t border-brand/15 pt-5">
-                                    <span className="text-sm font-semibold text-muted">
-                                        Design · Build · Learn
-                                    </span>
-                                    <ArrowUpRight className="h-5 w-5 text-brand" />
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </section>
+          <div className="mt-14 flex items-center justify-between border-t border-outline pt-5 text-xs font-medium uppercase tracking-[0.16em] text-muted">
+            <span>Discover / Create / Build</span>
+            <span>Scroll to explore</span>
+          </div>
+        </div>
+      </section>
 
-            {/* CATEGORIES SECTION */}
-            <section
-                id="categories"
-                className="mx-auto max-w-7xl scroll-mt-28 px-6 py-20 lg:py-24"
+      {/* PRODUCT DISCOVERY */}
+      <section
+        className="mx-auto max-w-7xl px-6 py-16 sm:py-20"
+        aria-labelledby="discover-heading"
+      >
+        <div className="mb-10 flex flex-wrap items-end justify-between gap-6">
+          <div>
+            <p className="mb-3 text-xs font-bold uppercase tracking-[0.2em] text-brand">
+              The marketplace
+            </p>
+
+            <h2
+              id="discover-heading"
+              className="text-3xl font-bold tracking-tight sm:text-4xl"
             >
-                <div className="mb-10 flex flex-wrap items-end justify-between gap-5">
-                    <div>
-                        <p className="mb-3 text-sm font-bold uppercase tracking-[0.2em] text-brand">
-                            Find your inspiration
-                        </p>
+              Discover digital products.
+            </h2>
 
-                        <h2 className="text-3xl font-extrabold tracking-tight sm:text-4xl">
-                            Explore what you can create.
-                        </h2>
+            <p className="mt-3 max-w-xl text-muted">
+              A selection of currently available products.
+            </p>
+          </div>
 
-                        <p className="mt-4 max-w-xl text-muted">
-                            From your first concept to your next launch,
-                            discover resources that move your work forward.
-                        </p>
-                    </div>
+          <Link
+            to="/products"
+            className="inline-flex items-center gap-2 text-sm font-semibold text-brand transition hover:gap-3"
+          >
+            View all products
+            <ArrowUpRight className="h-4 w-4" />
+          </Link>
+        </div>
 
-                    <Link
-                        to="/products"
-                        className="inline-flex items-center gap-2 font-semibold text-brand transition hover:opacity-75"
-                    >
-                        View all products
-                        <ArrowUpRight className="h-4 w-4" />
-                    </Link>
-                </div>
+        {loading && (
+          <div
+            className="grid gap-7 sm:grid-cols-2 lg:grid-cols-3"
+            role="status"
+            aria-label="Loading products"
+          >
+            {Array.from({ length: PREVIEW_LIMIT }).map((_, index) => (
+              <div key={index} className="animate-pulse">
+                <div className="aspect-[4/3] rounded-2xl bg-accent" />
+                <div className="mt-4 h-5 w-3/4 rounded bg-accent" />
+                <div className="mt-3 h-4 w-1/2 rounded bg-accent" />
+              </div>
+            ))}
+            <span className="sr-only">Loading products...</span>
+          </div>
+        )}
 
-                <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
-                    {categories.map((category) => {
-                        const Icon = category.icon
+        {!loading && error && (
+          <div
+            role="alert"
+            className="border-y border-outline py-12"
+          >
+            <h3 className="text-xl font-semibold">
+              Products are temporarily unavailable.
+            </h3>
+            <p className="mt-2 text-sm text-muted">
+              Please try again later or visit the marketplace.
+            </p>
+            <Link
+              to="/products"
+              className="mt-5 inline-flex items-center gap-2 font-semibold text-brand"
+            >
+              Open marketplace
+              <ArrowRight className="h-4 w-4" />
+            </Link>
+          </div>
+        )}
 
-                        return (
-                            <article
-                                key={category.title}
-                                className="group flex min-h-64 flex-col justify-between rounded-2xl border border-outline bg-surface p-6 transition duration-200 hover:-translate-y-1 hover:border-brand/40 hover:shadow-lg hover:shadow-black/5"
-                            >
-                                <div className="flex items-start justify-between">
-                                    <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-accent text-brand">
-                                        <Icon className="h-7 w-7" />
-                                    </div>
+        {!loading && !error && products.length === 0 && (
+          <div className="border-y border-outline py-16">
+            <h3 className="text-2xl font-semibold">
+              Our collection is taking shape.
+            </h3>
+            <p className="mt-3 max-w-lg text-muted">
+              No approved products are available yet.
+              Check back as new digital resources are added.
+            </p>
+          </div>
+        )}
 
-                                    <span className="text-sm font-semibold text-muted">
-                                        {category.label}
-                                    </span>
-                                </div>
+        {!loading && !error && products.length > 0 && (
+          <div className="grid gap-x-6 gap-y-12 sm:grid-cols-2 lg:grid-cols-3">
+            {products.map((product) => (
+              <ProductCard key={product.id} product={product} />
+            ))}
+          </div>
+        )}
+      </section>
 
-                                <div>
-                                    <h3 className="text-xl font-bold">
-                                        {category.title}
-                                    </h3>
+      {/* SELLORA PURPOSE */}
+      <section className="border-t border-outline bg-surface">
+        <div className="mx-auto grid max-w-7xl gap-8 px-6 py-16 md:grid-cols-[0.7fr_1.3fr] md:py-20">
+          <div>
+            <p className="text-xs font-bold uppercase tracking-[0.2em] text-brand">
+              Why Sellora
+            </p>
+          </div>
 
-                                    <p className="mt-2 text-sm leading-relaxed text-muted">
-                                        {category.description}
-                                    </p>
-                                </div>
-                            </article>
-                        )
-                    })}
-                </div>
-            </section>
+          <div>
+            <h2 className="max-w-3xl text-3xl font-semibold leading-tight tracking-tight sm:text-4xl">
+              Useful digital products deserve a place
+              where people can discover them.
+            </h2>
 
-            {/* FINAL CTA */}
-            <section className="border-t border-outline bg-surface">
-                <div className="mx-auto flex max-w-7xl flex-col items-start justify-between gap-8 px-6 py-16 md:flex-row md:items-center">
-                    <div>
-                        <p className="mb-3 text-sm font-bold uppercase tracking-[0.2em] text-brand">
-                            Discover Sellora
-                        </p>
+            <p className="mt-6 max-w-2xl leading-7 text-muted">
+              Sellora is being built to connect independent
+              creators with people looking for practical
+              digital resources. Our focus is straightforward:
+              make products easier to explore, evaluate,
+              and eventually purchase securely.
+            </p>
 
-                        <h2 className="max-w-2xl text-3xl font-extrabold tracking-tight sm:text-4xl">
-                            Better tools. Bigger possibilities.
-                        </h2>
-
-                        <p className="mt-4 max-w-xl text-muted">
-                            Explore digital products created to help
-                            you learn, build, and create.
-                        </p>
-                    </div>
-
-                    <Link
-                        to="/products"
-                        className="inline-flex shrink-0 items-center gap-2 rounded-xl bg-brand px-6 py-3.5 font-semibold text-brand-foreground transition hover:opacity-90"
-                    >
-                        Explore Marketplace
-                        <ArrowUpRight className="h-5 w-5" />
-                    </Link>
-                </div>
-            </section>
-        </main>
-    )
+            <Link
+              to="/products"
+              className="mt-8 inline-flex items-center gap-2 font-semibold text-brand"
+            >
+              Browse available products
+              <ArrowUpRight className="h-4 w-4" />
+            </Link>
+          </div>
+        </div>
+      </section>
+    </main>
+  )
 }

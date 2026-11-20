@@ -2,7 +2,7 @@
 import { useEffect } from 'react'
 import { Link, NavLink, useLocation } from 'react-router'
 
-import { useTheme } from '../context/ThemeContext'
+import { useTheme } from '../context/useTheme'
 import ThemeToggle from './ThemeToggle'
 
 export default function Navbar() {
