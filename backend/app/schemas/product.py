@@ -21,6 +21,10 @@ class ProductCreate(BaseModel):
 
         for tag in tags:
             tag = tag.strip().lower()
+            if "," in tag:
+                raise ValueError(
+                    "Each tag must be submitted separately; commas are not allowed"
+                )
 
             if not tag:
                 raise ValueError("Tags cannot be empty")
@@ -81,8 +85,15 @@ class ProductUpdate(BaseModel):
             if not tag:
                 raise ValueError("Tags cannot be empty")
 
+            if "," in tag:
+                raise ValueError(
+                    "Each tag must be submitted separately; commas are not allowed"
+                )
+
             if len(tag) > 50:
-                raise ValueError("Each tag must not exceed 50 characters")
+                raise ValueError(
+                    "Each tag must not exceed 50 characters"
+                )
 
             if tag not in cleaned_tags:
                 cleaned_tags.append(tag)
