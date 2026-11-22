@@ -4,7 +4,15 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from datetime import datetime, timedelta, timezone
 
 from app.schemas import RefreshRequest
-from app.services.auth import REFRESH_TOKEN_EXPIRE_DAYS, SECRET_KEY, ALGORITHM
+from app.services.auth import (
+    SECRET_KEY,
+    ALGORITHM,
+    REFRESH_TOKEN_EXPIRE_DAYS,
+    create_refresh_token,
+    hash_refresh_token,
+    create_access_token,
+    create_user_session,
+)
 from app.services.auth import (
     create_refresh_token,
     hash_refresh_token,
@@ -12,7 +20,7 @@ from app.services.auth import (
     create_user_session,
     REFRESH_TOKEN_EXPIRE_DAYS
 )
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Response, Cookie
 from sqlalchemy.orm import Session
 from pwdlib import PasswordHash
 
@@ -63,6 +71,7 @@ def create_user(user: UserCreate, db: Session = Depends(get_db)):
 @router.post("/login")
 def user_login(
     credentials: UserLogin,
+    response: Response,
     db: Session = Depends(get_db)
 ):
     user = db.query(User).filter(
@@ -82,6 +91,16 @@ def user_login(
 
     access_token = create_access_token(user.id, session.id)
 
+    response.set_cookie(
+        key="sellora_refresh",
+        value=refresh_token,
+        httponly=True,
+        secure=False,
+        samesite="lax",
+        path="/auth",
+        max_age=REFRESH_TOKEN_EXPIRE_DAYS * 24 * 60 * 60
+    )
+
     return {
         "access_token": access_token,
         "refresh_token": refresh_token,
@@ -96,12 +115,18 @@ def user_login(
 
 @router.post("/refresh")
 def refresh_access_token(
-    credentials: RefreshRequest,
+    response: Response,
+    sellora_refresh: str | None = Cookie(default=None),
     db: Session = Depends(get_db)
 ):
+    if not sellora_refresh:
+        raise HTTPException(
+            status_code=401,
+            detail="Refresh token cookie missing"
+        )
     now = datetime.now(timezone.utc)
 
-    token_hash = hash_refresh_token(credentials.refresh_token)
+    token_hash = hash_refresh_token(sellora_refresh)
 
     session = db.query(UserSession).filter(
         UserSession.refresh_token_hash == token_hash,
@@ -155,10 +180,18 @@ def refresh_access_token(
         session.user_id,
         session.id
     )
+    response.set_cookie(
+        key="sellora_refresh",
+        value=new_refresh_token,
+        httponly=True,
+        secure=False,
+        samesite="lax",
+        path="/auth",
+        max_age=REFRESH_TOKEN_EXPIRE_DAYS * 24 * 60 * 60
+    )
 
     return {
         "access_token": access_token,
-        "refresh_token": new_refresh_token,
         "token_type": "bearer"
     }
 
