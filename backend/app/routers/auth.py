@@ -197,6 +197,7 @@ def refresh_access_token(
 
 @router.post("/logout")
 def logout(
+    response: Response,
     credentials: HTTPAuthorizationCredentials = Depends(security),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
@@ -230,5 +231,13 @@ def logout(
 
     active_session.revoked_at = datetime.now(timezone.utc)
     db.commit()
+
+    response.delete_cookie(
+        key="sellora_refresh",
+        path="/auth",
+        secure=False,
+        httponly=True,
+        samesite="lax"
+    )
 
     return {"message": "Logged out successfully"}
