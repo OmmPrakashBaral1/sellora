@@ -103,7 +103,6 @@ def user_login(
 
     return {
         "access_token": access_token,
-        "refresh_token": refresh_token,
         "session_id": session.id,
         "token_type": "bearer",
         "message": "Login Successful!",
