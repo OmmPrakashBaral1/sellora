@@ -1,4 +1,17 @@
 import { useEffect, useRef, useState } from 'react'
+import {
+    createPayment,
+    verifyPayment,
+} from '../api/payments'
+
+import {
+    loadRazorpay,
+    openRazorpayCheckout,
+} from '../utils/razorpay'
+
+import type {
+    PaymentVerifyRequest,
+} from '../types/payment'
 import { createOrder } from '../api/orders'
 import type { OrderCreateResponse } from '../types/order'
 import { Link, useParams } from 'react-router'
@@ -26,6 +39,26 @@ export default function CheckoutPage() {
         useState<OrderCreateResponse | null>(null)
 
     const submissionRef = useRef(false)
+
+    const [paymentStage, setPaymentStage] = useState<
+        | 'idle'
+        | 'initializing'
+        | 'checkout'
+        | 'verifying'
+        | 'verification_pending'
+        | 'success'
+    >('idle')
+
+    const [paymentError, setPaymentError] =
+        useState<string | null>(null)
+
+    const [paymentMessage, setPaymentMessage] =
+        useState<string | null>(null)
+
+    const [paymentCredentials, setPaymentCredentials] =
+        useState<PaymentVerifyRequest | null>(null)
+
+    const paymentSubmissionRef = useRef(false)
 
 
     useEffect(() => {
@@ -124,6 +157,140 @@ export default function CheckoutPage() {
         }
     }
 
+    async function handlePayment() {
+        if (
+            !createdOrder ||
+            !user ||
+            paymentSubmissionRef.current ||
+            paymentStage === 'success'
+        ) {
+            return
+        }
+
+        paymentSubmissionRef.current = true
+
+        setPaymentError(null)
+        setPaymentMessage(null)
+
+        let credentials = paymentCredentials
+
+        try {
+            if (!credentials) {
+                setPaymentStage('initializing')
+
+                const Razorpay = await loadRazorpay()
+
+                const accessToken = await getAccessToken()
+
+                if (!accessToken) {
+                    throw new Error(
+                        'Unable to authenticate your session.',
+                    )
+                }
+
+                const payment = await createPayment(
+                    createdOrder.order_id,
+                    accessToken,
+                )
+
+                setPaymentStage('checkout')
+
+                credentials = await openRazorpayCheckout(
+                    Razorpay,
+                    {
+                        key: payment.razorpay_key_id,
+                        amount: payment.amount,
+                        currency: payment.currency,
+                        order_id: payment.razorpay_order_id,
+
+                        name: 'Sellora',
+                        description: `Order #${createdOrder.order_id}`,
+
+                        prefill: {
+                            name: user.name,
+                            email: user.gmail,
+                        },
+
+                        theme: {
+                            color: '#2563eb',
+                        },
+                    },
+                )
+
+                if (!credentials) {
+                    setPaymentStage('idle')
+
+                    setPaymentMessage(
+                        'Checkout closed. If money was deducted, check your payment status before trying again.',
+                    )
+
+                    return
+                }
+
+                setPaymentCredentials(credentials)
+            }
+
+            setPaymentStage('verifying')
+
+            const verificationToken = await getAccessToken()
+
+            if (!verificationToken) {
+                throw new Error(
+                    'Your session could not be authenticated for payment verification.',
+                )
+            }
+
+            const result = await verifyPayment(
+                credentials,
+                verificationToken,
+            )
+
+            const verified =
+                'payment_status' in result
+                    ? result.payment_status === 'SUCCESS' &&
+                    result.order_status === 'COMPLETED'
+                    : result.status === 'SUCCESS'
+
+            if (!verified) {
+                throw new Error(
+                    'Payment confirmation is still pending.',
+                )
+            }
+
+            setPaymentStage('success')
+
+            setPaymentMessage(
+                'Payment verified successfully. Your order is completed.',
+            )
+
+            setCreatedOrder((previous) =>
+                previous
+                    ? {
+                        ...previous,
+                        status: 'COMPLETED',
+                    }
+                    : previous,
+            )
+
+            setPaymentCredentials(null)
+        } catch (err) {
+            setPaymentError(
+                err instanceof Error
+                    ? err.message
+                    : 'Unable to complete payment.',
+            )
+
+            setPaymentStage(
+                credentials
+                    ? 'verification_pending'
+                    : 'idle',
+            )
+        } finally {
+            paymentSubmissionRef.current = false
+        }
+    }
+
+
     if (loading) {
         return (
             <main className="mx-auto max-w-5xl px-6 py-20">
@@ -166,6 +333,19 @@ export default function CheckoutPage() {
     }).format(
         Number(createdOrder?.total_amount ?? product.price),
     )
+    const paymentBusy =
+        paymentStage === 'initializing' ||
+        paymentStage === 'checkout' ||
+        paymentStage === 'verifying'
+
+    const paymentButtonLabel = {
+        idle: 'Proceed to payment',
+        initializing: 'Initializing payment...',
+        checkout: 'Checkout in progress...',
+        verifying: 'Verifying payment...',
+        verification_pending: 'Retry verification',
+        success: 'Payment completed',
+    }[paymentStage]
 
     return (
         <main className="min-h-screen bg-page text-foreground">
@@ -281,16 +461,45 @@ export default function CheckoutPage() {
                                     Status: {createdOrder.status}
                                 </p>
 
+                                {paymentError && (
+                                    <p
+                                        role="alert"
+                                        className="mt-4 text-sm text-red-500"
+                                    >
+                                        {paymentError}
+                                    </p>
+                                )}
+
+                                {paymentMessage && (
+                                    <p
+                                        role="status"
+                                        className="mt-4 text-sm text-muted"
+                                    >
+                                        {paymentMessage}
+                                    </p>
+                                )}
+
+                                {paymentStage === 'verification_pending' && (
+                                    <p className="mt-3 text-sm text-muted">
+                                        Your payment may have been received.
+                                        Retry verification instead of paying again.
+                                    </p>
+                                )}
+
                                 <button
                                     type="button"
-                                    disabled
+                                    onClick={handlePayment}
+                                    disabled={
+                                        paymentBusy ||
+                                        paymentStage === 'success'
+                                    }
                                     className="mt-5 w-full rounded-lg bg-brand px-5 py-3 font-semibold text-brand-foreground disabled:opacity-50"
                                 >
-                                    Proceed to payment
+                                    {paymentButtonLabel}
                                 </button>
 
                                 <p className="mt-3 text-center text-xs text-muted">
-                                    Payment integration is pending.
+                                    Payments are processed through Razorpay.
                                 </p>
                             </div>
                         ) : (
