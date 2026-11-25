@@ -154,15 +154,13 @@ export default function ProductDetailsPage() {
             </div>
 
             <div className="mt-9 flex flex-wrap gap-4">
-              <button
-                type="button"
-                disabled
-                title="Checkout integration coming soon"
-                className="inline-flex items-center gap-2 rounded-lg bg-brand px-7 py-3 font-semibold text-brand-foreground opacity-60"
+              <Link
+                to={`/checkout/${product.id}`}
+                className="inline-flex items-center gap-2 rounded-lg bg-brand px-7 py-3 font-semibold text-brand-foreground transition hover:opacity-90"
               >
                 <ShoppingBag size={19} />
                 Buy Now
-              </button>
+              </Link>
 
               {product.demo_url && (
                 <a
@@ -178,8 +176,7 @@ export default function ProductDetailsPage() {
             </div>
 
             <p className="mt-4 text-sm text-muted">
-              Secure checkout will be available after buyer
-              authentication and payment integration.
+              Review your purchase before proceeding to payment.
             </p>
           </section>
         </div>

@@ -1,5 +1,7 @@
 
-import { API_BASE_URL } from './client'
+import { API_BASE_URL, parseResponse } from './client'
+
+export { ApiError } from './client'
 
 export type AuthUser = {
     id: number
@@ -18,43 +20,6 @@ export type LoginResponse = AuthUser & {
 type TokenResponse = {
     access_token: string
     token_type: string
-}
-
-
-export class ApiError extends Error {
-    status: number
-
-    constructor(status: number, message: string) {
-        super(message)
-        this.name = 'ApiError'
-        this.status = status
-    }
-}
-
-
-async function parseResponse<T>(
-    response: Response
-): Promise<T> {
-    if (!response.ok) {
-        const body: unknown = await response
-            .json()
-            .catch(() => null)
-
-        let message = `Request failed (${response.status})`
-
-        if (
-            typeof body === 'object' &&
-            body !== null &&
-            'detail' in body &&
-            typeof body.detail === 'string'
-        ) {
-            message = body.detail
-        }
-
-        throw new ApiError(response.status, message)
-    }
-
-    return response.json() as Promise<T>
 }
 
 export async function login(
