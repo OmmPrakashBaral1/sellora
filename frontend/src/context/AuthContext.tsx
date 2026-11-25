@@ -1,21 +1,22 @@
 import {
-  useCallback,
-  useEffect,
-  useRef,
-  useState,
-  type ReactNode,
+    useCallback,
+    useEffect,
+    useRef,
+    useState,
+    type ReactNode,
 } from 'react'
 
 import {
-  login as apiLogin,
-  logout as apiLogout,
-  refreshAccessToken,
-  getMyProfile,
-  type AuthUser,
+    login as apiLogin,
+    logout as apiLogout,
+    refreshAccessToken,
+    getMyProfile,
+    ApiError,
+    type AuthUser,
 } from '../api/auth'
 
 import { AuthContext } from './auth-context'
-
+import { isAccessTokenUsable } from '../utils/token'
 
 export function AuthProvider({ children }: { children: ReactNode }) {
     const [user, setUser] = useState<AuthUser | null>(null)
@@ -31,20 +32,45 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setAccessToken(token)
     }, [])
 
+    const clearSession = useCallback(() => {
+        generationRef.current += 1
+        saveToken(null)
+        setUser(null)
+    }, [saveToken])
+
     const getAccessToken = useCallback(async () => {
-        if (tokenRef.current) return tokenRef.current
+        const existingToken = tokenRef.current
+
+        if (
+            existingToken &&
+            isAccessTokenUsable(existingToken)
+        ) {
+            return existingToken
+        }
 
         if (!refreshPromiseRef.current) {
             const generation = generationRef.current
 
-            const promise = refreshAccessToken().then((token) => {
-                if (generation !== generationRef.current) {
-                    throw new Error('Authentication state changed')
-                }
+            const promise = refreshAccessToken()
+                .then((token) => {
+                    if (generation !== generationRef.current) {
+                        throw new Error('Authentication state changed')
+                    }
 
-                saveToken(token)
-                return token
-            })
+                    saveToken(token)
+                    return token
+                })
+                .catch((error: unknown) => {
+                    if (
+                        generation === generationRef.current &&
+                        error instanceof ApiError &&
+                        error.status === 401
+                    ) {
+                        clearSession()
+                    }
+
+                    throw error
+                })
 
             refreshPromiseRef.current = promise
 
@@ -60,27 +86,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         } catch {
             return null
         }
-    }, [saveToken])
+    }, [saveToken, clearSession])
 
     useEffect(() => {
         let active = true
+        const generation = generationRef.current
 
         async function restoreSession() {
             try {
                 const token = await getAccessToken()
 
-                if (!token) {
-                    if (active) setUser(null)
-                    return
-                }
+                if (!token) return
 
                 const profile = await getMyProfile(token)
 
-                if (active) setUser(profile)
+                if (
+                    active &&
+                    generation === generationRef.current
+                ) {
+                    setUser(profile)
+                }
             } catch {
-                if (active) {
-                    saveToken(null)
-                    setUser(null)
+                if (
+                    active &&
+                    generation === generationRef.current
+                ) {
+                    clearSession()
                 }
             } finally {
                 if (active) setLoading(false)
@@ -92,9 +123,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return () => {
             active = false
         }
-    }, [getAccessToken, saveToken])
+    }, [getAccessToken, clearSession])
 
-    const login = useCallback(async (gmail: string, password: string) => {
+    const login = useCallback(async (
+        gmail: string,
+        password: string,
+    ) => {
+        if (refreshPromiseRef.current) {
+            await refreshPromiseRef.current.catch(() => { })
+        }
+
         const result = await apiLogin(gmail, password)
 
         generationRef.current += 1
@@ -109,18 +147,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }, [saveToken])
 
     const logout = useCallback(async () => {
+        const generation = generationRef.current
         const token = await getAccessToken()
 
         if (!token) {
-            throw new Error('No active session available for logout')
+            if (generation !== generationRef.current) {
+                return
+            }
+
+            throw new Error(
+                'Unable to verify your session. Please try again.',
+            )
         }
 
         await apiLogout(token)
-
-        generationRef.current += 1
-        saveToken(null)
-        setUser(null)
-    }, [getAccessToken, saveToken])
+        clearSession()
+    }, [getAccessToken, clearSession])
 
     return (
         <AuthContext.Provider
