@@ -7,7 +7,7 @@ from app.services.file_storage import get_private_file_path
 from decimal import Decimal, ROUND_HALF_UP
 
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from app.database import get_db
 from app.dependencies.auth import get_current_user, require_role
@@ -174,8 +174,15 @@ def get_my_orders(
 ):
     orders = (
         db.query(Order)
+        .options(
+            selectinload(Order.items)
+            .selectinload(OrderItem.product)
+        )
         .filter(Order.buyer_id == current_user.id)
-        .order_by(Order.created_at.desc())
+        .order_by(
+            Order.created_at.desc(),
+            Order.id.desc()
+        )
         .all()
     )
 
@@ -188,7 +195,11 @@ def get_my_orders(
             "items": [
                 {
                     "product_id": item.product_id,
-                    "price_at_purchase": str(item.price_at_purchase),
+                    "title": item.product.title,
+                    "thumbnail_url": item.product.thumbnail_url,
+                    "price_at_purchase": str(
+                        item.price_at_purchase
+                    ),
                     "quantity": item.quantity
                 }
                 for item in order.items
@@ -243,6 +254,10 @@ def get_order_by_id(
 ):
     order = (
         db.query(Order)
+        .options(
+            selectinload(Order.items)
+            .selectinload(OrderItem.product)
+        )
         .filter(
             Order.id == order_id,
             Order.buyer_id == current_user.id
@@ -265,7 +280,11 @@ def get_order_by_id(
         "items": [
             {
                 "product_id": item.product_id,
-                "price_at_purchase": str(item.price_at_purchase),
+                "title": item.product.title,
+                "thumbnail_url": item.product.thumbnail_url,
+                "price_at_purchase": str(
+                    item.price_at_purchase
+                ),
                 "quantity": item.quantity
             }
             for item in order.items

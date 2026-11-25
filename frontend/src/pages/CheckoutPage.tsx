@@ -497,6 +497,14 @@ export default function CheckoutPage() {
                                 >
                                     {paymentButtonLabel}
                                 </button>
+                                {paymentStage === 'success' && (
+                                    <Link
+                                        to="/orders"
+                                        className="mt-3 block w-full rounded-lg border border-outline px-5 py-3 text-center font-semibold transition hover:bg-page"
+                                    >
+                                        View my orders
+                                    </Link>
+                                )}
 
                                 <p className="mt-3 text-center text-xs text-muted">
                                     Payments are processed through Razorpay.

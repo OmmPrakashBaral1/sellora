@@ -125,6 +125,11 @@ export default function Navbar() {
             <NavLink to="/products" className={navLinkClass}>
               Explore
             </NavLink>
+            {!loading && user?.role === 'BUYER' && (
+              <NavLink to="/orders" className={navLinkClass}>
+                My Orders
+              </NavLink>
+            )}
           </div>
 
           {loading ? (

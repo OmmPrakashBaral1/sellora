@@ -1,4 +1,5 @@
 import { Route, Routes } from 'react-router'
+import OrdersPage from './pages/OrdersPage'
 import { useParams } from 'react-router'
 
 import Navbar from './components/Navbar'
@@ -50,6 +51,10 @@ export default function App() {
           <Route
             path="/checkout/:productId"
             element={<CheckoutRoute />}
+          />
+          <Route
+            path="/orders"
+            element={<OrdersPage />}
           />
         </Route>
       </Routes>

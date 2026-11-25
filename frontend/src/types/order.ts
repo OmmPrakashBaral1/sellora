@@ -23,3 +23,23 @@ export type OrderCreateResponse = {
   status: string
   seller_orders: SellerOrderSummary[]
 }
+
+export type OrderItem = {
+  product_id: number
+  title: string
+  thumbnail_url: string
+  price_at_purchase: string
+  quantity: number
+}
+
+export type BuyerOrder = {
+  order_id: number
+  total_amount: string
+  status: string
+  created_at: string | null
+  items: OrderItem[]
+}
+
+export type BuyerOrderDetails = BuyerOrder & {
+  buyer_id: number
+}
