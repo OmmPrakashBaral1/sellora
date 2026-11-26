@@ -274,7 +274,6 @@ export default function OrdersPage() {
                         <p className="mt-1 text-xs text-muted">
                           Unit price
                         </p>
-                        
                       </div>
                     </div>
                   ))}
@@ -291,17 +290,26 @@ export default function OrdersPage() {
                     </p>
                   </div>
 
-                  {order.status === 'COMPLETED' && (
-                    <p className="text-sm font-medium text-green-600">
-                      Payment verified
-                    </p>
-                  )}
+                  <div className="flex flex-wrap items-center gap-4">
+                    {order.status === 'COMPLETED' && (
+                      <p className="text-sm font-medium text-green-600">
+                        Payment verified
+                      </p>
+                    )}
 
-                  {order.status === 'PENDING' && (
-                    <p className="text-sm text-muted">
-                      Awaiting payment
-                    </p>
-                  )}
+                    {order.status === 'PENDING' && (
+                      <p className="text-sm text-muted">
+                        Awaiting payment
+                      </p>
+                    )}
+
+                    <Link
+                      to={`/orders/${order.order_id}`}
+                      className="rounded-lg border border-outline px-4 py-2 text-sm font-semibold transition hover:bg-page hover:text-brand"
+                    >
+                      View details
+                    </Link>
+                  </div>
                 </div>
               </article>
             ))}

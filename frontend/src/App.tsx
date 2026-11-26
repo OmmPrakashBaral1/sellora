@@ -11,11 +11,18 @@ import ProductDetailsPage from './pages/ProductDetailsPage'
 import LoginPage from './pages/LoginPage'
 import RegisterPage from './pages/RegisterPage'
 import CheckoutPage from './pages/CheckoutPage'
+import OrderDetailsPage from './pages/OrderDetailsPage'
 
 function CheckoutRoute() {
   const { productId } = useParams()
 
   return <CheckoutPage key={productId} />
+}
+
+function OrderDetailsRoute() {
+  const { orderId } = useParams()
+
+  return <OrderDetailsPage key={orderId} />
 }
 
 export default function App() {
@@ -55,6 +62,10 @@ export default function App() {
           <Route
             path="/orders"
             element={<OrdersPage />}
+          />
+          <Route
+            path="/orders/:orderId"
+            element={<OrderDetailsRoute />}
           />
         </Route>
       </Routes>
