@@ -33,8 +33,10 @@ export default function CheckoutPage() {
         paymentError,
         paymentMessage,
         paymentBusy,
+        paymentBlocked,
         paymentButtonLabel,
         handlePayment,
+        handleReconciliation,
     } = useOrderPayment({
         orderId: createdOrder?.order_id ?? null,
         orderStatus: createdOrder?.status ?? null,
@@ -329,11 +331,28 @@ export default function CheckoutPage() {
                                     </p>
                                 )}
 
+                                {paymentStage === 'recovery_required' && (
+                                    <div
+                                        role="alert"
+                                        className="mt-4 rounded-lg border border-amber-500/20 bg-amber-500/10 p-4"
+                                    >
+                                        <p className="font-semibold text-amber-600">
+                                            Payment status unresolved
+                                        </p>
+
+                                        <p className="mt-2 text-sm text-muted">
+                                            Check your previous payment status
+                                            before attempting another payment.
+                                        </p>
+                                    </div>
+                                )}
+
                                 <button
                                     type="button"
                                     onClick={handlePayment}
                                     disabled={
                                         paymentBusy ||
+                                        paymentBlocked ||
                                         paymentStage === 'success' ||
                                         createdOrder.status !== 'PENDING'
                                     }
@@ -341,6 +360,29 @@ export default function CheckoutPage() {
                                 >
                                     {paymentButtonLabel}
                                 </button>
+
+                                {createdOrder.status === 'PENDING' && (
+                                    <Link
+                                        to={`/orders/${createdOrder.order_id}`}
+                                        className="mt-3 block text-center text-sm font-semibold text-brand hover:underline"
+                                    >
+                                        View order details
+                                    </Link>
+                                )}
+
+                                {createdOrder.status === 'PENDING' && (
+                                    <button
+                                        type="button"
+                                        onClick={handleReconciliation}
+                                        disabled={paymentBusy}
+                                        className="mt-3 w-full rounded-lg border border-brand px-5 py-3 text-sm font-semibold text-brand transition hover:bg-brand/10 disabled:opacity-50"
+                                    >
+                                        {paymentStage === 'reconciling'
+                                            ? 'Checking payment status...'
+                                            : 'Check payment status'}
+                                    </button>
+                                )}
+
                                 {paymentStage === 'success' && (
                                     <Link
                                         to="/orders"

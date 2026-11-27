@@ -75,8 +75,10 @@ export default function OrderDetailsPage() {
     paymentError,
     paymentMessage,
     paymentBusy,
+    paymentBlocked,
     paymentButtonLabel,
     handlePayment,
+    handleReconciliation,
   } = useOrderPayment({
     orderId: order?.order_id ?? null,
     orderStatus: order?.status ?? null,
@@ -85,9 +87,9 @@ export default function OrderDetailsPage() {
       setOrder((previous) =>
         previous
           ? {
-              ...previous,
-              status: 'COMPLETED',
-            }
+            ...previous,
+            status: 'COMPLETED',
+          }
           : previous,
       )
     },
@@ -273,7 +275,7 @@ export default function OrderDetailsPage() {
                       <p className="font-bold">
                         {formatPrice(
                           Number(item.price_at_purchase) *
-                            item.quantity,
+                          item.quantity,
                         )}
                       </p>
 
@@ -410,11 +412,29 @@ export default function OrderDetailsPage() {
                   </p>
                 )}
 
+                {paymentStage === 'recovery_required' && (
+                  <div
+                    role="alert"
+                    className="mt-4 rounded-lg border border-amber-500/20 bg-amber-500/10 p-4"
+                  >
+                    <p className="font-semibold text-amber-600">
+                      Payment status unresolved
+                    </p>
+
+                    <p className="mt-2 text-sm text-muted">
+                      A previous payment attempt may still be
+                      processing. Check your payment status before
+                      attempting another payment.
+                    </p>
+                  </div>
+                )}
+
                 <button
                   type="button"
                   onClick={handlePayment}
                   disabled={
                     paymentBusy ||
+                    paymentBlocked ||
                     paymentStage === 'success'
                   }
                   className="mt-6 w-full rounded-lg bg-brand px-5 py-3 font-semibold text-brand-foreground disabled:opacity-50"
@@ -422,6 +442,20 @@ export default function OrderDetailsPage() {
                   {paymentStage === 'idle'
                     ? 'Resume payment'
                     : paymentButtonLabel}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleReconciliation}
+                  disabled={
+                    paymentBusy ||
+                    paymentStage === 'success'
+                  }
+                  className="mt-3 w-full rounded-lg border border-brand px-5 py-3 text-sm font-semibold text-brand transition hover:bg-brand/10 disabled:opacity-50"
+                >
+                  {paymentStage === 'reconciling'
+                    ? 'Checking payment status...'
+                    : 'Check payment status'}
                 </button>
 
                 <button

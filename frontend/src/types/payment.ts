@@ -27,3 +27,20 @@ export type PaymentVerifyResponse =
       order_status: 'COMPLETED'
       completed_seller_orders: number
     }
+
+export type PaymentReconcileResponse =
+  | {
+      message: string
+      order_id: number
+      payment_id: number
+      order_status: 'COMPLETED'
+      payment_status: 'SUCCESS'
+      reconciled: boolean
+    }
+  | {
+      message: string
+      order_id: number
+      order_status: 'PENDING'
+      payment_status: 'PENDING' | 'NOT_INITIATED'
+      reconciled: false
+    }

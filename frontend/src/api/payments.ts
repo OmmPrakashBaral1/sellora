@@ -1,4 +1,5 @@
 import { API_BASE_URL, parseResponse } from './client'
+import type { PaymentReconcileResponse } from '../types/payment'
 
 import type {
   PaymentCreateResponse,
@@ -40,4 +41,24 @@ export async function verifyPayment(
   )
 
   return parseResponse<PaymentVerifyResponse>(response)
+}
+
+export async function reconcilePayment(
+  orderId: number,
+  accessToken: string,
+): Promise<PaymentReconcileResponse> {
+  const response = await fetch(
+    `${API_BASE_URL}/payments/reconcile/${orderId}`,
+    {
+      method: 'POST',
+
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    },
+  )
+
+  return parseResponse<PaymentReconcileResponse>(
+    response,
+  )
 }

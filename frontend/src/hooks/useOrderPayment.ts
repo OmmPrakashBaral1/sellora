@@ -1,8 +1,10 @@
+
 import { useRef, useState } from 'react'
 
 import {
   createPayment,
   verifyPayment,
+  reconcilePayment,
 } from '../api/payments'
 
 import {
@@ -22,6 +24,8 @@ export type PaymentStage =
   | 'checkout'
   | 'verifying'
   | 'verification_pending'
+  | 'recovery_required'
+  | 'reconciling'
   | 'success'
 
 type UseOrderPaymentOptions = {
@@ -50,8 +54,18 @@ export function useOrderPayment({
     useRef<PaymentVerifyRequest | null>(null)
 
   const paymentSubmissionRef = useRef(false)
-
   const paymentSucceededRef = useRef(false)
+  const recoveryRequiredRef = useRef(false)
+
+  function completePayment(message: string) {
+    paymentSucceededRef.current = true
+    recoveryRequiredRef.current = false
+    paymentCredentialsRef.current = null
+
+    setPaymentStage('success')
+    setPaymentError(null)
+    setPaymentMessage(message)
+  }
 
   async function handlePayment() {
     if (
@@ -61,6 +75,16 @@ export function useOrderPayment({
       paymentSubmissionRef.current ||
       paymentSucceededRef.current
     ) {
+      return
+    }
+
+    if (
+      recoveryRequiredRef.current &&
+      !paymentCredentialsRef.current
+    ) {
+      setPaymentError(
+        'Check your previous payment status before attempting another payment.',
+      )
       return
     }
 
@@ -75,8 +99,6 @@ export function useOrderPayment({
       if (!credentials) {
         setPaymentStage('initializing')
 
-        const Razorpay = await loadRazorpay()
-
         const accessToken = await getAccessToken()
 
         if (!accessToken) {
@@ -84,6 +106,46 @@ export function useOrderPayment({
             'Unable to authenticate your session.',
           )
         }
+
+        const existingPayment = await reconcilePayment(
+          orderId,
+          accessToken,
+        )
+
+        if (existingPayment.order_id !== orderId) {
+          throw new Error(
+            'Payment response does not match this order.',
+          )
+        }
+
+        if (
+          existingPayment.payment_status === 'SUCCESS' &&
+          existingPayment.order_status === 'COMPLETED'
+        ) {
+          completePayment(
+            'Your payment has already been confirmed.',
+          )
+          onSuccess()
+          return
+        }
+
+        if (
+          existingPayment.payment_status !== 'NOT_INITIATED'
+        ) {
+          recoveryRequiredRef.current = true
+
+          setPaymentStage('recovery_required')
+
+          setPaymentMessage(
+            'A previous payment attempt exists. Check its status before making another payment.',
+          )
+
+          return
+        }
+
+        const Razorpay = await loadRazorpay()
+
+        recoveryRequiredRef.current = true
 
         const payment = await createPayment(
           orderId,
@@ -115,10 +177,10 @@ export function useOrderPayment({
         )
 
         if (!credentials) {
-          setPaymentStage('idle')
+          setPaymentStage('recovery_required')
 
           setPaymentMessage(
-            'Checkout closed. If money was deducted, check your payment status before trying again.',
+            'Checkout closed. Check your payment status before attempting another payment.',
           )
 
           return
@@ -154,12 +216,7 @@ export function useOrderPayment({
         )
       }
 
-      paymentSucceededRef.current = true
-      paymentCredentialsRef.current = null
-
-      setPaymentStage('success')
-
-      setPaymentMessage(
+      completePayment(
         'Payment verified successfully. Your order is completed.',
       )
     } catch (err) {
@@ -172,7 +229,9 @@ export function useOrderPayment({
       setPaymentStage(
         credentials
           ? 'verification_pending'
-          : 'idle',
+          : recoveryRequiredRef.current
+            ? 'recovery_required'
+            : 'idle',
       )
 
       return
@@ -183,10 +242,111 @@ export function useOrderPayment({
     onSuccess()
   }
 
+  async function handleReconciliation() {
+    if (
+      orderId === null ||
+      orderStatus !== 'PENDING' ||
+      !user ||
+      paymentSubmissionRef.current ||
+      paymentSucceededRef.current
+    ) {
+      return
+    }
+
+    paymentSubmissionRef.current = true
+
+    setPaymentError(null)
+    setPaymentMessage(null)
+    setPaymentStage('reconciling')
+
+    let completed = false
+
+    try {
+      const accessToken = await getAccessToken()
+
+      if (!accessToken) {
+        throw new Error(
+          'Unable to authenticate your session.',
+        )
+      }
+
+      const result = await reconcilePayment(
+        orderId,
+        accessToken,
+      )
+
+      if (result.order_id !== orderId) {
+        throw new Error(
+          'Payment response does not match this order.',
+        )
+      }
+
+      if (
+        result.payment_status === 'SUCCESS' &&
+        result.order_status === 'COMPLETED'
+      ) {
+        completePayment(
+          result.reconciled
+            ? 'Payment recovered successfully. Your order is completed.'
+            : 'Your payment has already been confirmed.',
+        )
+
+        completed = true
+      } else if (
+        result.payment_status === 'NOT_INITIATED' &&
+        !paymentCredentialsRef.current
+      ) {
+        recoveryRequiredRef.current = false
+
+        setPaymentStage('idle')
+
+        setPaymentMessage(
+          'No previous payment attempt was found.',
+        )
+      } else {
+        recoveryRequiredRef.current = true
+
+        setPaymentStage(
+          paymentCredentialsRef.current
+            ? 'verification_pending'
+            : 'recovery_required',
+        )
+
+        setPaymentMessage(
+          'Payment is not yet confirmed. Do not pay again if money has been deducted.',
+        )
+      }
+    } catch (err) {
+      recoveryRequiredRef.current = true
+
+      setPaymentError(
+        err instanceof Error
+          ? err.message
+          : 'Unable to check payment status.',
+      )
+
+      setPaymentStage(
+        paymentCredentialsRef.current
+          ? 'verification_pending'
+          : 'recovery_required',
+      )
+    } finally {
+      paymentSubmissionRef.current = false
+    }
+
+    if (completed) {
+      onSuccess()
+    }
+  }
+
   const paymentBusy =
     paymentStage === 'initializing' ||
     paymentStage === 'checkout' ||
-    paymentStage === 'verifying'
+    paymentStage === 'verifying' ||
+    paymentStage === 'reconciling'
+
+  const paymentBlocked =
+    paymentStage === 'recovery_required'
 
   const paymentButtonLabel = {
     idle: 'Proceed to payment',
@@ -194,6 +354,8 @@ export function useOrderPayment({
     checkout: 'Checkout in progress...',
     verifying: 'Verifying payment...',
     verification_pending: 'Retry verification',
+    recovery_required: 'Payment status unresolved',
+    reconciling: 'Checking payment status...',
     success: 'Payment completed',
   }[paymentStage]
 
@@ -202,7 +364,9 @@ export function useOrderPayment({
     paymentError,
     paymentMessage,
     paymentBusy,
+    paymentBlocked,
     paymentButtonLabel,
     handlePayment,
+    handleReconciliation,
   }
 }
