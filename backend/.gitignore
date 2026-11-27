@@ -4,3 +4,11 @@ __pycache__/
 venv/
 .venv/
 private_uploads/
+
+# Testing artifacts
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Test environment credentials
+.env.test

@@ -42,6 +42,7 @@ def settle_captured_payment(
         db.query(Order)
         .filter(Order.id == initial_payment.order_id)
         .with_for_update()
+        .populate_existing()
         .first()
     )
 
@@ -73,6 +74,7 @@ def settle_captured_payment(
         db.query(SellerOrder)
         .filter(SellerOrder.order_id == order.id)
         .with_for_update()
+        .populate_existing()
         .all()
     )
 

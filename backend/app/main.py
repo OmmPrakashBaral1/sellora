@@ -3,7 +3,7 @@ from fastapi import FastAPI, Depends
 
 from sqlalchemy.orm import Session
 
-from app.database import Base, engine, get_db
+from app.database import engine, get_db
 from app.models import User
 from app.routers.auth import router as auth_router
 from app.routers.products import router as products_router
@@ -36,9 +36,6 @@ app.add_middleware(
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["Authorization", "Content-Type"]
 )
-
-Base.metadata.create_all(bind=engine)
-
 
 
 @app.get("/")

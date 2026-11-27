@@ -316,3 +316,252 @@ def verify_payment(
         "order_status": "COMPLETED",
         "completed_seller_orders": settlement["seller_orders_count"]
     }
+
+
+@router.post("/reconcile/{order_id}")
+def reconcile_payment(
+    order_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role("BUYER"))
+):
+    order = (
+        db.query(Order)
+        .filter(
+            Order.id == order_id,
+            Order.buyer_id == current_user.id
+        )
+        .first()
+    )
+
+    if order is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Order not found"
+        )
+
+    if order.status not in ("PENDING", "COMPLETED"):
+        raise HTTPException(
+            status_code=409,
+            detail="This order is not eligible for payment reconciliation"
+        )
+
+    payments = (
+        db.query(Payment)
+        .filter(Payment.order_id == order.id)
+        .all()
+    )
+
+    if not payments:
+        if order.status == "COMPLETED":
+            raise HTTPException(
+                status_code=409,
+                detail="Completed order has no payment record"
+            )
+
+        return {
+            "message": "No payment attempt exists for this order",
+            "order_id": order.id,
+            "order_status": order.status,
+            "payment_status": "NOT_INITIATED",
+            "reconciled": False
+        }
+
+    if len(payments) != 1:
+        raise HTTPException(
+            status_code=409,
+            detail="Multiple payment records require manual reconciliation"
+        )
+
+    payment = payments[0]
+
+    if (
+        payment.provider != "RAZORPAY"
+        or not payment.razorpay_order_id
+        or payment.amount != order.total_amount
+        or payment.amount <= Decimal("0.00")
+    ):
+        raise HTTPException(
+            status_code=409,
+            detail="Local payment information is inconsistent"
+        )
+
+    if payment.status not in ("PENDING", "SUCCESS"):
+        raise HTTPException(
+            status_code=409,
+            detail="Payment requires manual reconciliation"
+        )
+
+    if (
+        order.status == "COMPLETED"
+        and payment.status != "SUCCESS"
+    ) or (
+        order.status == "PENDING"
+        and payment.status == "SUCCESS"
+    ):
+        raise HTTPException(
+            status_code=409,
+            detail="Local order and payment statuses are inconsistent"
+        )
+
+    local_payment_id = payment.id
+    razorpay_order_id = payment.razorpay_order_id
+    expected_amount = int(payment.amount * 100)
+
+    try:
+        gateway_order = client.order.fetch(
+            razorpay_order_id
+        )
+
+        gateway_response = client.order.payments(
+            razorpay_order_id
+        )
+
+    except Exception:
+        logger.exception(
+            "Unable to reconcile Razorpay order for local order %s",
+            order_id
+        )
+
+        raise HTTPException(
+            status_code=502,
+            detail="Unable to retrieve payment status from Razorpay"
+        )
+
+    if (
+        not isinstance(gateway_order, dict)
+        or gateway_order.get("id") != razorpay_order_id
+        or gateway_order.get("currency") != "INR"
+        or gateway_order.get("amount") != expected_amount
+    ):
+        raise HTTPException(
+            status_code=409,
+            detail="Gateway order information does not match the local order"
+        )
+
+    if not isinstance(gateway_response, dict):
+        raise HTTPException(
+            status_code=502,
+            detail="Invalid payment response from Razorpay"
+        )
+
+    gateway_payments = gateway_response.get("items")
+
+    if (
+        not isinstance(gateway_payments, list)
+        or any(
+            not isinstance(item, dict)
+            for item in gateway_payments
+        )
+    ):
+        raise HTTPException(
+            status_code=502,
+            detail="Invalid payment collection from Razorpay"
+        )
+
+    captured_payments = [
+        item for item in gateway_payments
+        if item.get("status") == "captured"
+    ]
+
+    if not captured_payments:
+        if (
+            gateway_order.get("status") == "paid"
+            or gateway_order.get("amount_paid") != 0
+            or payment.status == "SUCCESS"
+        ):
+            raise HTTPException(
+                status_code=409,
+                detail="Gateway payment information requires further reconciliation"
+            )
+
+        db.refresh(order)
+        db.refresh(payment)
+
+        return {
+            "message": "No captured payment was found",
+            "order_id": order.id,
+            "order_status": order.status,
+            "payment_status": payment.status,
+            "reconciled": False
+        }
+
+    if len(captured_payments) != 1:
+        raise HTTPException(
+            status_code=409,
+            detail="Multiple captured payments require manual reconciliation"
+        )
+
+    captured_payment = captured_payments[0]
+
+    razorpay_payment_id = captured_payment.get("id")
+
+    if (
+        not isinstance(razorpay_payment_id, str)
+        or not razorpay_payment_id
+        or captured_payment.get("order_id") != razorpay_order_id
+        or captured_payment.get("currency") != "INR"
+        or captured_payment.get("amount") != expected_amount
+        or captured_payment.get("amount_refunded") != 0
+        or gateway_order.get("status") != "paid"
+        or gateway_order.get("amount_paid") != expected_amount
+    ):
+        raise HTTPException(
+            status_code=409,
+            detail="Captured payment details require manual reconciliation"
+        )
+
+    try:
+        settlement = settle_captured_payment(
+            db=db,
+            payment_id=local_payment_id,
+            razorpay_order_id=razorpay_order_id,
+            razorpay_payment_id=razorpay_payment_id
+        )
+
+        db.commit()
+
+    except PaymentSettlementError as exc:
+        db.rollback()
+
+        raise HTTPException(
+            status_code=exc.status_code,
+            detail=exc.detail
+        )
+
+    except IntegrityError:
+        db.rollback()
+
+        logger.exception(
+            "Payment reconciliation violated a database constraint"
+        )
+
+        raise HTTPException(
+            status_code=409,
+            detail="Payment reconciliation conflicts with an existing record"
+        )
+
+    except Exception:
+        db.rollback()
+
+        logger.exception(
+            "Payment reconciliation failed for order %s",
+            order_id
+        )
+
+        raise HTTPException(
+            status_code=500,
+            detail="Unable to reconcile payment"
+        )
+
+    return {
+        "message": (
+            "Payment already reconciled"
+            if settlement["already_settled"]
+            else "Payment reconciled successfully"
+        ),
+        "order_id": settlement["order_id"],
+        "payment_id": settlement["payment_id"],
+        "order_status": "COMPLETED",
+        "payment_status": "SUCCESS",
+        "reconciled": not settlement["already_settled"]
+    }
