@@ -3,6 +3,11 @@ import mimetypes
 from fastapi.responses import FileResponse
 
 from app.services.file_storage import get_private_file_path
+from app.services.download_access import (
+    get_downloadable_order,
+    get_downloadable_items,
+    get_downloadable_item
+)
 
 from decimal import Decimal, ROUND_HALF_UP
 
@@ -20,6 +25,7 @@ from app.models import (
     SellerProfile,
     Payment
 )
+
 from app.schemas.order import OrderCreate
 
 import logging
@@ -292,72 +298,109 @@ def get_order_by_id(
     }
 
 
+
 @router.get("/{order_id}/downloads")
 def get_order_downloads(
     order_id: int,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_role("BUYER"))
 ):
-    order = db.query(Order).filter(
-        Order.id == order_id,
-        Order.buyer_id == current_user.id
-    ).first()
+    order = get_downloadable_order(
+        db=db,
+        order_id=order_id,
+        buyer_id=current_user.id
+    )
 
-    if order is None:
-        raise HTTPException(
-            status_code=404,
-            detail="Order not found"
-        )
-
-    if order.status != "COMPLETED":
-        raise HTTPException(
-            status_code=403,
-            detail="Order is not completed"
-        )
-
-    successful_payment = db.query(Payment).filter(
-        Payment.order_id == order.id,
-        Payment.status == "SUCCESS"
-    ).first()
-
-    if successful_payment is None:
-        raise HTTPException(
-            status_code=403,
-            detail="Successful payment is required for downloads"
-        )
-
-    completed_items = [
-        item for item in order.items
-        if item.seller_order is not None
-        and item.seller_order.status == "COMPLETED"
-    ]
+    completed_items = get_downloadable_items(order)
 
     if not completed_items:
         raise HTTPException(
-            status_code=400,
+            status_code=403,
             detail="No completed seller orders available for download"
         )
 
+    downloads = []
+
+    for item in completed_items:
+        download_available = False
+
+        if item.product.file_storage_key:
+            try:
+                get_private_file_path(
+                    item.product.file_storage_key
+                )
+
+                download_available = True
+
+            except HTTPException as exc:
+                if exc.status_code != 404:
+                    raise
+
+        downloads.append({
+            "product_id": item.product_id,
+            "title": item.product.title,
+            "download_available": download_available,
+            "download_url": (
+                f"/orders/{order.id}/downloads/{item.product_id}"
+                if download_available
+                else None
+            )
+        })
+
     return {
         "order_id": order.id,
-        "downloads": [
-            {
-                "product_id": item.product_id,
-                "title": item.product.title,
-                "download_available": bool(
-                    item.product.file_storage_key
-                ),
-                "download_url": (
-                    f"/orders/{order.id}/downloads/{item.product_id}"
-                    if item.product.file_storage_key
-                    else None
-                )
-            }
-            for item in completed_items
-        ]
+        "downloads": downloads
     }
 
 
+@router.get("/{order_id}/downloads/{product_id}")
+def download_purchased_product(
+    order_id: int,
+    product_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role("BUYER"))
+):
+    order = get_downloadable_order(
+        db=db,
+        order_id=order_id,
+        buyer_id=current_user.id
+    )
+
+    item = get_downloadable_item(
+        order=order,
+        product_id=product_id
+    )
+
+    storage_key = item.product.file_storage_key
+
+    if not storage_key:
+        raise HTTPException(
+            status_code=404,
+            detail="Product file is unavailable"
+        )
+
+    file_path = get_private_file_path(storage_key)
+
+    media_type = (
+        mimetypes.guess_type(file_path.name)[0]
+        or "application/octet-stream"
+    )
+
+    download_filename = (
+        f"sellora-product-{item.product_id}"
+        f"{file_path.suffix}"
+    )
+
+    return FileResponse(
+        path=file_path,
+        media_type=media_type,
+        filename=download_filename,
+        content_disposition_type="attachment",
+        headers={
+            "Cache-Control": "private, no-store",
+            "X-Content-Type-Options": "nosniff"
+        }
+    )
 
 @router.patch("/{order_id}/cancel")
 def cancel_order(

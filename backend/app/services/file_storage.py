@@ -151,10 +151,16 @@ async def save_private_file(file: UploadFile) -> str:
         await file.close()
 
 
-def get_private_file_path(storage_key: str) -> Path:
-    """Resolve a storage key without allowing path traversal."""
 
-    if not re.fullmatch(
+def get_private_file_path(storage_key: str) -> Path:
+    """
+    Resolve a private storage key to a safe physical file.
+
+    Reject invalid keys, symbolic links, paths outside
+    private storage, and missing files.
+    """
+
+    if not isinstance(storage_key, str) or not re.fullmatch(
         r"[a-f0-9]{32}\.(zip|pdf|png|jpg|jpeg|mp3|mp4)",
         storage_key
     ):
@@ -163,9 +169,29 @@ def get_private_file_path(storage_key: str) -> Path:
             detail="File not found."
         )
 
-    file_path = PRIVATE_STORAGE_DIR / storage_key
+    try:
+        storage_root = PRIVATE_STORAGE_DIR.resolve(strict=True)
 
-    if not file_path.is_file():
+        candidate = storage_root / storage_key
+
+        if candidate.is_symlink():
+            raise HTTPException(
+                status_code=404,
+                detail="File not found."
+            )
+
+        file_path = candidate.resolve(strict=True)
+
+        if (
+            file_path.parent != storage_root
+            or not file_path.is_file()
+        ):
+            raise HTTPException(
+                status_code=404,
+                detail="File not found."
+            )
+
+    except (OSError, RuntimeError, ValueError):
         raise HTTPException(
             status_code=404,
             detail="File not found."
