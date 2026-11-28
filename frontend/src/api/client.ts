@@ -1,3 +1,4 @@
+
 export const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL ?? '/api'
 
@@ -11,27 +12,35 @@ export class ApiError extends Error {
   }
 }
 
+export async function ensureSuccessfulResponse(
+  response: Response,
+): Promise<void> {
+  if (response.ok) {
+    return
+  }
+
+  const body: unknown = await response
+    .json()
+    .catch(() => null)
+
+  let message = `Request failed (${response.status})`
+
+  if (
+    typeof body === 'object' &&
+    body !== null &&
+    'detail' in body &&
+    typeof body.detail === 'string'
+  ) {
+    message = body.detail
+  }
+
+  throw new ApiError(response.status, message)
+}
+
 export async function parseResponse<T>(
   response: Response,
 ): Promise<T> {
-  if (!response.ok) {
-    const body: unknown = await response
-      .json()
-      .catch(() => null)
-
-    let message = `Request failed (${response.status})`
-
-    if (
-      typeof body === 'object' &&
-      body !== null &&
-      'detail' in body &&
-      typeof body.detail === 'string'
-    ) {
-      message = body.detail
-    }
-
-    throw new ApiError(response.status, message)
-  }
+  await ensureSuccessfulResponse(response)
 
   return response.json() as Promise<T>
 }

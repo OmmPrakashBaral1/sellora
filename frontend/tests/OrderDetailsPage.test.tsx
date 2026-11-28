@@ -18,6 +18,7 @@ import {
 import OrderDetailsPage from '../src/pages/OrderDetailsPage'
 
 import { getOrderById } from '../src/api/orders'
+import { getOrderDownloads } from '../src/api/orders'
 
 import {
   createPayment,
@@ -44,6 +45,8 @@ import type {
 
 vi.mock('../src/api/orders', () => ({
   getOrderById: vi.fn(),
+  getOrderDownloads: vi.fn(),
+  downloadPurchasedProduct: vi.fn(),
 }))
 
 vi.mock('../src/api/payments', () => ({
@@ -162,8 +165,8 @@ const recoveredResponse: PaymentReconcileResponse = {
 // Fake Razorpay constructor
 
 class FakeRazorpay {
-  open() {}
-  close() {}
+  open() { }
+  close() { }
 }
 
 
@@ -225,7 +228,19 @@ beforeEach(() => {
   mockOpenCheckout.mockResolvedValue(
     paymentCredentials,
   )
+  vi.mocked(getOrderDownloads).mockResolvedValue({
+    order_id: 20,
+    downloads: [
+      {
+        product_id: 1,
+        title: 'Test Digital Product',
+        download_available: true,
+        download_url: '/orders/20/downloads/1',
+      },
+    ],
+  })
 })
+
 
 
 describe('OrderDetailsPage payment workflow', () => {
@@ -521,8 +536,17 @@ describe('OrderDetailsPage payment workflow', () => {
       'Payment recovered successfully. Your order is completed.',
     )).toBeInTheDocument()
 
-    expect(screen.getByText('Purchase completed'))
-      .toBeInTheDocument()
+    expect(
+      screen.getByRole('heading', {
+        name: 'Product downloads',
+      }),
+    ).toBeInTheDocument()
+
+    expect(
+      await screen.findByRole('button', {
+        name: 'Download',
+      }),
+    ).toBeInTheDocument()
 
     expect(screen.queryByText('PENDING'))
       .not.toBeInTheDocument()
@@ -560,8 +584,17 @@ describe('OrderDetailsPage payment workflow', () => {
     expect(await screen.findByText('COMPLETED'))
       .toBeInTheDocument()
 
-    expect(screen.getByText('Purchase completed'))
-      .toBeInTheDocument()
+    expect(
+      screen.getByRole('heading', {
+        name: 'Product downloads',
+      }),
+    ).toBeInTheDocument()
+
+    expect(
+      await screen.findByRole('button', {
+        name: 'Download',
+      }),
+    ).toBeInTheDocument()
 
     expect(screen.queryByRole('button', {
       name: 'Resume payment',

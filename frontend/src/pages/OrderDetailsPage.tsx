@@ -5,13 +5,16 @@ import {
   ArrowLeft,
   CheckCircle2,
   Clock,
+  Download,
   ShieldCheck,
   XCircle,
 } from 'lucide-react'
 
+
 import { getOrderById } from '../api/orders'
 import { useAuth } from '../context/useAuth'
 import { useOrderPayment } from '../hooks/useOrderPayment'
+import { useOrderDownloads } from '../hooks/useOrderDownloads'
 
 import type { BuyerOrderDetails } from '../types/order'
 
@@ -93,6 +96,20 @@ export default function OrderDetailsPage() {
           : previous,
       )
     },
+  })
+
+  const {
+    downloads,
+    downloadsLoading,
+    downloadsError,
+    downloadError,
+    downloadMessage,
+    activeDownloadId,
+    retryDownloads,
+    handleDownload,
+  } = useOrderDownloads({
+    orderId: order?.order_id ?? null,
+    orderStatus: order?.status ?? null,
   })
 
   useEffect(() => {
@@ -474,18 +491,125 @@ export default function OrderDetailsPage() {
               </>
             )}
 
+
             {order.status === 'COMPLETED' && (
-              <div className="mt-6 rounded-lg border border-green-500/20 bg-green-500/10 p-4">
-                <p className="font-semibold text-green-600">
-                  Purchase completed
-                </p>
+              <div className="mt-6 border-t border-outline pt-6">
+                <div className="flex items-center gap-2">
+                  <Download
+                    size={20}
+                    className="text-brand"
+                  />
+
+                  <h3 className="font-bold">
+                    Product downloads
+                  </h3>
+                </div>
 
                 <p className="mt-2 text-sm text-muted">
-                  Product downloads will be available here
-                  once digital delivery is enabled.
+                  Access your purchased digital products.
                 </p>
+
+                {downloadsLoading && (
+                  <p
+                    role="status"
+                    className="mt-4 text-sm text-muted"
+                  >
+                    Loading product downloads...
+                  </p>
+                )}
+
+                {downloadsError && (
+                  <div className="mt-4">
+                    <p
+                      role="alert"
+                      className="text-sm text-red-500"
+                    >
+                      {downloadsError}
+                    </p>
+
+                    <button
+                      type="button"
+                      onClick={retryDownloads}
+                      className="mt-3 text-sm font-semibold text-brand"
+                    >
+                      Retry loading downloads
+                    </button>
+                  </div>
+                )}
+
+                {!downloadsLoading &&
+                  !downloadsError &&
+                  downloads.length === 0 && (
+                    <p className="mt-4 text-sm text-muted">
+                      No product downloads are currently available.
+                    </p>
+                  )}
+
+                {!downloadsLoading &&
+                  !downloadsError &&
+                  downloads.length > 0 && (
+                    <div className="mt-5 space-y-4">
+                      {downloads.map((product) => (
+                        <div
+                          key={product.product_id}
+                          className="rounded-lg border border-outline p-4"
+                        >
+                          <p className="break-words text-sm font-semibold">
+                            {product.title}
+                          </p>
+
+                          {product.download_available &&
+                            product.download_url ? (
+                            <>
+                              <p className="mt-2 text-xs text-green-600">
+                                Available for download
+                              </p>
+
+                              <button
+                                type="button"
+                                disabled={activeDownloadId !== null}
+                                onClick={() =>
+                                  void handleDownload(product.product_id)
+                                }
+                                className="mt-3 flex w-full items-center justify-center gap-2 rounded-lg bg-brand px-4 py-2.5 text-sm font-semibold text-brand-foreground disabled:opacity-50"
+                              >
+                                <Download size={16} />
+
+                                {activeDownloadId === product.product_id
+                                  ? 'Downloading...'
+                                  : 'Download'}
+                              </button>
+                            </>
+                          ) : (
+                            <p className="mt-2 text-xs text-muted">
+                              File currently unavailable
+                            </p>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                {downloadError && (
+                  <p
+                    role="alert"
+                    className="mt-4 text-sm text-red-500"
+                  >
+                    {downloadError}
+                  </p>
+                )}
+
+                {downloadMessage && (
+                  <p
+                    role="status"
+                    className="mt-4 text-sm text-green-600"
+                  >
+                    {downloadMessage}
+                  </p>
+                )}
               </div>
             )}
+
 
             {order.status === 'CANCELLED' && (
               <p className="mt-6 text-sm text-muted">

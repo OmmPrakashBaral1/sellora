@@ -43,3 +43,20 @@ export type BuyerOrder = {
 export type BuyerOrderDetails = BuyerOrder & {
   buyer_id: number
 }
+
+export type OrderDownloadItem = {
+  product_id: number
+  title: string
+  download_available: boolean
+  download_url: string | null
+}
+
+export type OrderDownloadsResponse = {
+  order_id: number
+  downloads: OrderDownloadItem[]
+}
+
+export type DownloadedFile = {
+  blob: Blob
+  filename: string
+}
